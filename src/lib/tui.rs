@@ -3,7 +3,7 @@ const HR_WIDTH: usize = 50;
 
 /// Prints the startup banner with available commands.
 pub fn welcome() {
-    println!("Welcome to nighthawk");
+    println!("Welcome to chickadee");
     println!("Try the following commands");
     hr();
     println!("{}", command_hint());

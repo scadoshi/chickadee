@@ -1,4 +1,4 @@
-use nighthawk::{
+use chickadee::{
     log::{DATA_PATH, Log, SSTABLES_PATH, WAL_PATH},
     run::Runner,
 };

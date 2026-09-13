@@ -1,6 +1,6 @@
-# nighthawk
+# chickadee
 
-Log-structured key-value store in Rust. Named after the Common Nighthawk — a bird that persists through change.
+Log-structured key-value store in Rust. Named after the bird that caches thousands of seeds each autumn and grows extra hippocampus to remember where they went.
 
 ## Phase 1 — Append-only log with in-memory index
 

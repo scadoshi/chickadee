@@ -1,8 +1,10 @@
-# nighthawk
+# chickadee
 
 Log-structured key-value store in Rust.
 
-Named after the Common Nighthawk — a bird that persists through change.
+Named after the bird that does this for a living. A chickadee caches thousands of seeds across its territory each autumn, and grows extra hippocampus to remember where it put them. Write it down, find it again later. That is the whole job.
+
+The sibling project is `steller`, an in-memory Redis-compatible server. Another bird from the same forest, covering the other half of how a KV system gets built.
 
 ## Running
 
@@ -53,7 +55,7 @@ Works identically in the CLI and over TCP.
 
 ## How it works
 
-Nighthawk is an LSM-tree (Log-Structured Merge-tree) key-value store.
+Chickadee is an LSM-tree (Log-Structured Merge-tree) key-value store.
 
 **Write path**
 - Writes append to a write-ahead log (WAL) and update an in-memory `BTreeMap` (the memtable)

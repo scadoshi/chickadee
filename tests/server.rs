@@ -1,4 +1,4 @@
-use nighthawk::{log::Log, run::Runner};
+use chickadee::{log::Log, run::Runner};
 use std::{
     io::{BufRead, BufReader, BufWriter, Write},
     net::{TcpListener, TcpStream},

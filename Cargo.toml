@@ -1,5 +1,5 @@
 [package]
-name = "nighthawk"
+name = "chickadee"
 version = "0.1.0"
 edition = "2024"
 
@@ -12,7 +12,7 @@ name = "server"
 path = "src/bin/server.rs"
 
 [lib]
-name = "nighthawk"
+name = "chickadee"
 path = "src/lib/lib.rs"
 
 [dependencies]

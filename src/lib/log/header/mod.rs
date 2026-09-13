@@ -7,8 +7,12 @@ pub(crate) mod writer;
 /// Size of the entry header in bytes: magic (2) + crc32 (4) + entry_len (4).
 pub(super) const HEADER_LEN: u64 = 10;
 /// Magic bytes written at the start of every entry, used to locate entry boundaries.
-/// (String translation: "NH")
-pub(super) const MAGIC: u16 = 0x4E48;
+///
+/// Serialized little-endian, so the literal is byte-swapped relative to what lands on
+/// disk: 0x4443 writes `[0x43, 0x44]`, which is "CD" in a hex dump. That readability is
+/// the whole point of a magic number, since it is what lets you eyeball entry boundaries
+/// in a corrupt file.
+pub(super) const MAGIC: u16 = 0x4443;
 
 #[cfg(test)]
 mod tests {

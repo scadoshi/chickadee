@@ -6,6 +6,8 @@ Named after the bird that does this for a living. A chickadee caches thousands o
 
 The sibling project is `steller`, an in-memory Redis-compatible server. Another bird from the same forest, covering the other half of how a KV system gets built.
 
+![One byte flipped in the log: the corrupted entry is dropped, later entries survive](demo/demo.gif)
+
 ## Running
 
 ### CLI

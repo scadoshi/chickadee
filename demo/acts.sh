@@ -6,6 +6,19 @@
 
 CAP=0.0; MAIN=0.1; A=0.2; B=0.3
 
+# A short prompt for the demo panes only, set before capture starts so the command
+# that sets it never appears. The default prompt is 31 characters of username and
+# host, which is a quarter of a pane once the font is big enough to read in a GIF.
+# %1~ tracks the directory, so it stays right when an act cds elsewhere.
+set_prompt() {
+  # PROMPT_EOL_MARK is the reverse-video % zsh prints when output ends mid-line.
+  # Harmless in daily use, distracting at the top of every pane in a recording.
+  tmux send-keys -t "$1" "export PS1='%1~ \$ ' PROMPT_EOL_MARK=''" Enter
+  tmux send-keys -t "$1" 'clear' Enter
+  sleep 0.15
+  tmux clear-history -t "$1"   # drop the scrollback too, or the old prompt shows through
+}
+
 build_layout() {
   tmux kill-session -t "$SESSION" 2>/dev/null || true
   rm -f "$CAPTION_FILE"; : > "$CAPTION_FILE"
@@ -27,8 +40,7 @@ build_layout() {
   tmux select-pane -t "$A"    -T 'disk'
   tmux select-pane -t "$B"    -T 'second client'
 
-  for p in "$MAIN" "$A" "$B"; do
-    tmux list-panes -t "$SESSION" -F "#{pane_index}" | grep -qx "${p##*.}" || continue tmux send-keys -t "$p" 'clear' Enter; done
+  for p in "$MAIN" "$A" "$B"; do set_prompt "$p"; done
   tmux send-keys -t "$CAP" "source demo/lib.sh; caption_loop" Enter
   sleep 0.6
 }
@@ -40,10 +52,12 @@ pin_layout() {
 }
 
 reset_state() {
-  for p in "$MAIN" "$A" "$B"; do
-    tmux send-keys -t "$p" C-c; sleep 0.2
-    tmux send-keys -t "$p" 'quit' Enter; sleep 0.2
-    tmux send-keys -t "$p" 'clear' Enter
+  # Address only the panes that exist; an act may have dropped one.
+  local idx
+  for idx in $(tmux list-panes -t "$SESSION" -F '#{pane_index}' | grep -v '^0$'); do
+    tmux send-keys -t "$SESSION":0."$idx" C-c; sleep 0.2
+    tmux send-keys -t "$SESSION":0."$idx" 'quit' Enter; sleep 0.2
+    tmux send-keys -t "$SESSION":0."$idx" 'clear' Enter
   done
   pkill -f 'target/debug/server' 2>/dev/null || true
   rm -rf data
@@ -72,6 +86,9 @@ act1_cli_basics() {
 }
 
 act2_wal_on_disk() {
+  # xxd emits 67-character lines. Give the disk pane most of the width so they
+  # land whole, rather than narrowing the dump and splitting keys across rows.
+  tmux resize-pane -t "$MAIN" -x 35% 2>/dev/null || true
   say "Every write hits the log before anything else. Let's go look at it."
   cli
   seed city seattle

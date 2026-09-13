@@ -60,7 +60,7 @@ Chickadee is an LSM-tree (Log-Structured Merge-tree) key-value store.
 **Write path**
 - Writes append to a write-ahead log (WAL) and update an in-memory `BTreeMap` (the memtable)
 - Each entry is wrapped in a 10-byte header: `[magic: 2B][crc32: 4B][entry_len: 4B]`
-- Magic bytes (`0x4E48` / "NH") mark entry boundaries for corruption recovery
+- Magic bytes (`0x4443`, "CD" in a hex dump) mark entry boundaries for corruption recovery
 - CRC32 checksums detect corrupt entries; the reader scans byte-by-byte past bad data
 - `sync_all()` is called after every write for durability
 - When the memtable exceeds 4MB, it is flushed to a new timestamped SSTable file

@@ -1,5 +1,7 @@
 const HR_CHAR: &str = "-";
-const HR_WIDTH: usize = 50;
+/// Wide enough to underline the command list and no wider. 50 was arbitrary and
+/// overhung the longest line by 14 characters, which wrapped in a narrow pane.
+const HR_WIDTH: usize = 36;
 
 /// Prints the startup banner with available commands.
 pub fn welcome() {

@@ -45,9 +45,29 @@ build_layout() {
   sleep 0.6
 }
 
+# Only the last act needs a second client. The others left an empty pane in frame
+# for the whole clip, so drop it and let the disk pane take the column.
+want_second_client() {
+  local have
+  have=$(tmux list-panes -t "$SESSION" | wc -l | tr -d ' ')
+  if [ "$1" = "yes" ] && [ "$have" -lt 4 ]; then
+    tmux split-window -v -l 50% -t "$SESSION":0.2
+    tmux select-pane -t "$SESSION":0.3 -T 'second client'
+    set_prompt "$SESSION":0.3
+    B="$SESSION":0.3
+  elif [ "$1" = "no" ] && [ "$have" -ge 4 ]; then
+    tmux kill-pane -t "$SESSION":0.3 2>/dev/null || true
+  fi
+  sleep 0.3
+}
+
 pin_layout() {
+  # Only balance the stacked panes when there are two. With one pane in the right
+  # column, resizing it to 50% gives the other half back to the caption row.
+  local panes
+  panes=$(tmux list-panes -t "$SESSION" | wc -l | tr -d ' ')
+  [ "$panes" -ge 4 ] && tmux resize-pane -t "$A" -y 50% 2>/dev/null
   tmux resize-pane -t "$CAP" -y 2 2>/dev/null || true
-  tmux resize-pane -t "$A"   -y 50% 2>/dev/null || true
   sleep 0.3
 }
 
@@ -158,9 +178,11 @@ act5_concurrent_clients() {
 
 run_act() {
   case "$1" in
-    1) act1_cli_basics ;;         2) act2_wal_on_disk ;;
-    3) act3_durability ;;         4) act4_corruption_recovery ;;
-    5) act5_concurrent_clients ;;
+    1) want_second_client no;  pin_layout; act1_cli_basics ;;
+    2) want_second_client no;  pin_layout; act2_wal_on_disk ;;
+    3) want_second_client no;  pin_layout; act3_durability ;;
+    4) want_second_client no;  pin_layout; act4_corruption_recovery ;;
+    5) want_second_client yes; pin_layout; act5_concurrent_clients ;;
     *) echo "unknown act: $1" >&2; return 1 ;;
   esac
 }

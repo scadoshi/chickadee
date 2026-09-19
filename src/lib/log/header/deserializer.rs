@@ -28,8 +28,12 @@ pub(super) struct Deserializer;
 pub(super) type HeaderDeserializer = Deserializer;
 
 impl Deserializer {
-    /// Decodes one header-prefixed value. Checks magic and CRC32 first. The second value
-    /// is bytes consumed, `HEADER_LEN + entry_len`, so the caller can advance its cursor.
+    /// Parses a header-prefixed byte slice and returns the decoded value and the total
+    /// bytes consumed.
+    ///
+    /// Validates the magic bytes and CRC32 before attempting deserialization. The number
+    /// of bytes consumed is `HEADER_LEN + entry_len`, so the caller can advance its read
+    /// cursor.
     pub(super) fn deserialize<'de, T>(value: &'de [u8]) -> Result<(T, usize), CorruptionType>
     where
         T: SchemaRead<'de, DefaultConfig, Dst = T>,

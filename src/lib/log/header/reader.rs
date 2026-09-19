@@ -3,7 +3,8 @@ use anyhow::Context;
 use std::io::{Read, Seek, SeekFrom};
 use wincode::{SchemaRead, config::DefaultConfig};
 
-/// Reads the record format written by [`HeaderWriter`](super::writer::HeaderWriter).
+/// Reads entries in the on-disk header format:
+/// `[magic: 2B][crc32: 4B][entry_len: 4B][wincode-serialized Entry]`
 pub(crate) trait HeaderReader<T>
 where
     T: for<'de> SchemaRead<'de, DefaultConfig, Dst = T>,

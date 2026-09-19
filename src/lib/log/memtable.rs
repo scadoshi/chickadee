@@ -12,7 +12,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-/// Newest entry per key, sorted. Tracks its own byte size so the log knows when to flush.
+/// In-memory sorted map of the most recent entry per key. Tracks its own byte size so the
+/// log knows when to flush.
 #[derive(Debug)]
 pub(crate) struct MemTable {
     inner: BTreeMap<String, Entry>,
@@ -30,7 +31,7 @@ impl MemTable {
         Self { inner, size }
     }
 
-    /// Replays `file` from the start.
+    /// Rebuilds a `MemTable` by replaying every entry in `file` from the start.
     pub(crate) fn from_file(file: &mut File) -> anyhow::Result<Self> {
         let mut memtable = Self::new();
         file.seek(SeekFrom::Start(0))?;
@@ -45,7 +46,9 @@ impl MemTable {
         self.size
     }
 
-    /// Tombstones are stored like any other entry. Returns whatever the key held before.
+    /// Applies an entry: inserts for both `Set` and `Delete` (tombstones are stored like any
+    /// other entry) and updates the tracked byte size. Returns the previous entry for the
+    /// key, if any.
     pub(crate) fn process(&mut self, entry: Entry) -> anyhow::Result<Option<Entry>> {
         if let Some(previous) = self.inner.get(entry.key()) {
             self.size = self.size.saturating_sub(Self::entry_size(previous)?);
@@ -65,7 +68,8 @@ impl MemTable {
         self.size() > FLUSH_THRESHOLD_MB * (1 << 20)
     }
 
-    /// Writes a new timestamped `SSTable` under `path`, then clears the memtable.
+    /// Writes all entries in sorted key order to a new timestamped `SSTable` file under
+    /// `path`, then clears the memtable. A no-op when empty.
     pub(crate) fn flush_to(&mut self, mut path: PathBuf) -> anyhow::Result<()> {
         if self.is_empty() {
             return Ok(());

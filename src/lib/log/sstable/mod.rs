@@ -6,8 +6,12 @@ use super::{entry::Entry, header::reader::HeaderReader};
 use anyhow::Context;
 use std::{fs::File, io::Seek, path::Path};
 
-/// One flushed memtable: header-prefixed [`Entry`] records in key order, then a
-/// [`BloomFilter`] footer so lookups can skip files that cannot hold the key.
+/// An immutable, on-disk sorted table of key-value entries produced by flushing the
+/// memtable.
+///
+/// Each file holds wincode-encoded [`Entry`] records prefixed with the standard on-disk
+/// header, followed by a [`BloomFilter`] footer used to skip files that cannot contain a
+/// queried key.
 #[derive(Debug)]
 pub(super) struct SSTable {
     bloom_filter: BloomFilter,
@@ -16,7 +20,9 @@ pub(super) struct SSTable {
 }
 
 impl SSTable {
-    /// `None` if the file is too small for a footer or holds no valid entry.
+    /// Opens the `SSTable` at `path`, reads its bloom filter footer, and positions the
+    /// cursor at the first entry. Returns `None` if the file is too small for a footer
+    /// or holds no valid entry.
     pub(super) fn from_path(path: impl AsRef<Path>) -> anyhow::Result<Option<Self>> {
         let mut file = File::open(path.as_ref())?;
         let Some(bloom_filter) = file.read_bloom_filter()? else {

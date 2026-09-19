@@ -7,9 +7,13 @@ use std::{
 };
 
 impl Log {
-    /// K-way merge of every `SSTable` into a fresh set. Walks all files in key order; on a
-    /// duplicate key the newest file wins and tombstones are dropped. Output flushes at the
-    /// memtable threshold, then the originals are deleted.
+    /// Compacts all `SSTable`s into a fresh set using a k-way merge.
+    ///
+    /// Processes entries in sorted key order across all files at once; when several
+    /// `SSTable`s hold the same key, the newest file wins and tombstones are dropped.
+    /// Intermediate output is flushed to new `SSTable` files whenever the memtable
+    /// threshold is exceeded, with a final flush for whatever remains. All original
+    /// `SSTable`s are deleted once the compacted output is written.
     pub fn compact(&mut self) -> anyhow::Result<()> {
         // File names are timestamps, so descending order is newest first.
         let mut entries: Vec<_> = read_dir(&self.sstables_path)?.collect::<Result<_, _>>()?;

@@ -25,7 +25,8 @@ pub const SSTABLES_PATH: &str = "data/sstables";
 /// Compaction runs when `flush_count` is a multiple of this.
 const COMPACT_EVERY_N_FLUSHES: u64 = 10;
 
-/// Owns the WAL and the memtable. `SSTable`s stay on disk under `sstables_path`.
+/// Append-only log store. Owns the write-ahead log file and the in-memory
+/// key-to-entry memtable; flushed `SSTable`s live on disk under `sstables_path`.
 #[derive(Debug)]
 pub struct Log {
     wal_file: File,
@@ -35,7 +36,8 @@ pub struct Log {
 }
 
 impl Log {
-    /// `truncate` wipes an existing WAL instead of replaying it.
+    /// Opens or creates the WAL and rebuilds the memtable from its contents. `truncate`
+    /// wipes an existing WAL instead of replaying it.
     pub fn new(
         data_path: impl Into<PathBuf>,
         wal_path: impl Into<PathBuf>,
@@ -68,7 +70,8 @@ impl Log {
         })
     }
 
-    /// WAL first, fsync, then memtable.
+    /// Appends the entry with its header to the WAL and syncs to disk, then applies it
+    /// to the memtable.
     pub fn write(&mut self, entry: Entry) -> anyhow::Result<()> {
         self.wal_file.header_write(&entry)?;
         self.wal_file.sync_all()?;
@@ -76,7 +79,8 @@ impl Log {
         Ok(())
     }
 
-    /// Memtable first, then `SSTable`s newest to oldest. A tombstone in either layer means `None`.
+    /// Looks up a key: checks the memtable first, then scans `SSTable`s newest to oldest.
+    /// Returns `None` if the key is absent or deleted in either layer.
     pub fn get(&self, key: impl AsRef<str>) -> anyhow::Result<Option<Entry>> {
         if let Some(entry) = self.memtable.get(key.as_ref()) {
             return match entry {
@@ -111,8 +115,9 @@ impl Log {
         self.get(key).map(|o| o.is_some())
     }
 
-    /// Flushes the memtable to a new `SSTable`, truncates the WAL, and compacts every
-    /// `COMPACT_EVERY_N_FLUSHES` flushes.
+    /// Writes all memtable entries, sorted by key, to a new timestamped `SSTable` file,
+    /// then truncates the WAL and clears the memtable. Every `COMPACT_EVERY_N_FLUSHES`
+    /// flushes it also runs a compaction.
     pub fn flush(&mut self) -> anyhow::Result<()> {
         self.memtable.flush_to(self.sstables_path.clone())?;
         self.wal_file.set_len(0)?;
@@ -124,7 +129,7 @@ impl Log {
         Ok(())
     }
 
-    /// Flushes only if the memtable is past its size threshold.
+    /// Flushes to an `SSTable` only if the memtable is past `FLUSH_THRESHOLD_MB`.
     pub fn maybe_flush(&mut self) -> anyhow::Result<()> {
         if self.memtable.should_flush() {
             self.flush()

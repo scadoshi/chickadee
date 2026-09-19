@@ -212,8 +212,7 @@ mod tests {
 
     #[test]
     fn compact_drops_tombstone_from_output() {
-        // Regression: a winning Delete used to be written into the compacted SSTable, and
-        // get() then resurrected the older Set behind it.
+        // A winning Delete must not land in the output, or get() would find the older Set.
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();

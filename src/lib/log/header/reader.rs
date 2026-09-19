@@ -11,7 +11,7 @@ where
     /// Next valid entry from the cursor. On corruption it walks forward a byte at a time
     /// until magic and checksum both line up again.
     fn header_read_next(&mut self) -> anyhow::Result<Option<T>>;
-    /// Does not move the cursor.
+    /// Whether the file holds at least one valid entry. Does not move the cursor.
     fn header_has_at_least_one(&mut self) -> anyhow::Result<bool>;
 }
 

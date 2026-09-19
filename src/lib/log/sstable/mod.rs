@@ -40,6 +40,7 @@ impl SSTable {
         }))
     }
 
+    /// The filter read from this file's footer.
     pub(super) fn bloom_filter(&self) -> &BloomFilter {
         &self.bloom_filter
     }

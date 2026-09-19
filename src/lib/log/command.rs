@@ -3,12 +3,16 @@ use crate::tui;
 use std::io::Write;
 use thiserror::Error;
 
+/// Why a line of input did not parse.
 #[derive(Debug, Error)]
 pub enum CommandError {
+    /// The first word is not a command or alias.
     #[error("unrecognized command")]
     UnrecognizedCommand,
+    /// Fewer arguments than the command takes.
     #[error("missing required arguments")]
     MissingRequiredArguments,
+    /// More arguments than the command takes.
     #[error("too many arguments")]
     TooManyArguments,
 }
@@ -16,10 +20,15 @@ pub enum CommandError {
 /// A parsed line of user input. `Quit` and `Help` never touch the log.
 #[derive(Debug)]
 pub enum Command {
+    /// Store a value under a key.
     Set { key: String, value: String },
+    /// Look up a key.
     Get { key: String },
+    /// Remove a key.
     Delete { key: String },
+    /// Leave the REPL.
     Quit,
+    /// Print the command list.
     Help,
 }
 
@@ -70,6 +79,7 @@ impl TryFrom<&str> for Command {
 }
 
 impl Command {
+    /// Builds a `Set`.
     pub fn set(key: impl Into<String>, value: impl Into<String>) -> Self {
         Self::Set {
             key: key.into(),
@@ -77,14 +87,17 @@ impl Command {
         }
     }
 
+    /// Builds a `Get`.
     pub fn get(key: impl Into<String>) -> Self {
         Self::Get { key: key.into() }
     }
 
+    /// Builds a `Delete`.
     pub fn delete(key: impl Into<String>) -> Self {
         Self::Delete { key: key.into() }
     }
 
+    /// The key for `Set`, `Get`, and `Delete`; `None` otherwise.
     pub fn key(&self) -> Option<&str> {
         match self {
             Self::Set { key, .. } | Self::Get { key } | Self::Delete { key } => Some(key.as_str()),
@@ -92,6 +105,7 @@ impl Command {
         }
     }
 
+    /// The value for `Set`; `None` otherwise.
     pub fn value(&self) -> Option<&str> {
         match self {
             Self::Set { value, .. } => Some(value.as_str()),
@@ -100,8 +114,10 @@ impl Command {
     }
 }
 
-/// Implemented here rather than on `Log` so command handling sits next to `Command`.
+/// Runs commands against a log. A trait rather than inherent methods so command
+/// handling sits next to `Command`.
 pub trait Execute {
+    /// Applies `command` and writes the response to `writer`.
     fn execute(&mut self, command: Command, writer: &mut impl Write) -> anyhow::Result<()>;
 }
 

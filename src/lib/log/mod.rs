@@ -16,9 +16,13 @@ use std::{
     path::PathBuf,
 };
 
+/// Root of everything persisted.
 pub const DATA_PATH: &str = "data";
+/// The write-ahead log file.
 pub const WAL_PATH: &str = "data/wal";
+/// Where flushed `SSTable`s go.
 pub const SSTABLES_PATH: &str = "data/sstables";
+/// Compaction runs when `flush_count` is a multiple of this.
 const COMPACT_EVERY_N_FLUSHES: u64 = 10;
 
 /// Owns the WAL and the memtable. `SSTable`s stay on disk under `sstables_path`.
@@ -102,6 +106,7 @@ impl Log {
         Ok(None)
     }
 
+    /// Whether `get` would find `key`.
     pub fn contains(&self, key: impl AsRef<str>) -> anyhow::Result<bool> {
         self.get(key).map(|o| o.is_some())
     }
@@ -119,6 +124,7 @@ impl Log {
         Ok(())
     }
 
+    /// Flushes only if the memtable is past its size threshold.
     pub fn maybe_flush(&mut self) -> anyhow::Result<()> {
         if self.memtable.should_flush() {
             self.flush()
@@ -265,8 +271,7 @@ mod tests {
 
     #[test]
     fn get_returns_none_after_flush_and_delete() {
-        // Regression: deleting a key already flushed to an SSTable used to only clear the
-        // memtable, so get() found the old Set in the SSTable.
+        // A tombstone in the memtable must shadow a Set already flushed to an SSTable.
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();

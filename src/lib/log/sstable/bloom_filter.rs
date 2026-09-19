@@ -49,6 +49,7 @@ impl BloomFilter {
         }
     }
 
+    /// Sets all 7 positions for `key`.
     pub(crate) fn insert(&mut self, key: &[u8]) {
         for pos in positions(key, self.bit_count) {
             if let Some(byte) = self.get_mut(pos / 8) {

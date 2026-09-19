@@ -2,18 +2,24 @@ use super::{HEADER_LEN, MAGIC};
 use thiserror::Error;
 use wincode::{SchemaRead, config::DefaultConfig};
 
+/// Why a byte slice did not yield an entry.
 #[derive(Debug, Error)]
 pub(crate) enum CorruptionType {
+    /// Too short for the header plus the length it declares.
     #[error("slice too short for header and entry")]
     NotEnoughBytes,
+    /// The first two bytes are not `MAGIC`.
     #[error("missing magic bytes at entry boundary")]
     MagicBytesMismatch,
+    /// CRC32 of the payload differs from the stored one.
     #[error("checksum mismatch: entry data corrupted")]
     ChecksumMismatch,
+    /// Header and checksum are fine but wincode rejected the payload.
     #[error("failed to deserialize entry payload")]
     ParseError,
 }
 
+/// Strips and validates the on-disk header from a byte slice.
 pub(super) struct Deserializer;
 
 /// Use this name at call sites; it pairs with [`HeaderSerializer`].
@@ -22,8 +28,8 @@ pub(super) struct Deserializer;
 pub(super) type HeaderDeserializer = Deserializer;
 
 impl Deserializer {
-    /// Checks magic and CRC32 before decoding. The second value is bytes consumed,
-    /// `HEADER_LEN + entry_len`, so the caller can advance its cursor.
+    /// Decodes one header-prefixed value. Checks magic and CRC32 first. The second value
+    /// is bytes consumed, `HEADER_LEN + entry_len`, so the caller can advance its cursor.
     pub(super) fn deserialize<'de, T>(value: &'de [u8]) -> Result<(T, usize), CorruptionType>
     where
         T: SchemaRead<'de, DefaultConfig, Dst = T>,

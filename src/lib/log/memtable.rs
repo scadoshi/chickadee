@@ -19,9 +19,11 @@ pub(crate) struct MemTable {
     size: u64,
 }
 
+/// Memtable size, in mebibytes, above which it flushes to an `SSTable`.
 pub(super) const FLUSH_THRESHOLD_MB: u64 = 4;
 
 impl MemTable {
+    /// Empty, with zero tracked size.
     pub(crate) fn new() -> Self {
         let inner = BTreeMap::<String, Entry>::new();
         let size = 0;
@@ -58,6 +60,7 @@ impl MemTable {
         Ok(key_len.saturating_add(payload_len))
     }
 
+    /// Whether the tracked size is past `FLUSH_THRESHOLD_MB`.
     pub(crate) fn should_flush(&self) -> bool {
         self.size() > FLUSH_THRESHOLD_MB * (1 << 20)
     }
@@ -92,28 +95,34 @@ impl MemTable {
         Ok(())
     }
 
+    /// Drops every entry and resets the tracked size.
     pub(crate) fn clear(&mut self) {
         self.size = 0;
         self.inner.clear();
     }
 
+    /// Number of distinct keys.
     pub(crate) fn len(&self) -> usize {
         self.inner.len()
     }
 
+    /// No entries and zero tracked size.
     pub(crate) fn is_empty(&self) -> bool {
         self.size == 0 && self.inner.is_empty()
     }
 
+    /// Whether `key` has an entry, tombstone included.
     #[cfg(test)]
     pub(crate) fn contains_key(&self, key: impl AsRef<str>) -> bool {
         self.inner.contains_key(key.as_ref())
     }
 
+    /// The entry for `key`, tombstone included.
     pub(crate) fn get(&self, key: impl AsRef<str>) -> Option<&Entry> {
         self.inner.get(key.as_ref())
     }
 
+    /// Entries in ascending key order.
     pub(crate) fn values(&self) -> Values<'_, String, Entry> {
         self.inner.values()
     }

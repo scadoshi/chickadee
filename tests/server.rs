@@ -40,6 +40,7 @@ fn start_server() -> std::net::SocketAddr {
     addr
 }
 
+/// Sends one command line and returns the trimmed response line.
 fn send(stream: &mut BufReader<TcpStream>, writer: &mut impl Write, cmd: &str) -> String {
     writeln!(writer, "{cmd}").unwrap();
     writer.flush().unwrap();

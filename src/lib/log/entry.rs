@@ -3,23 +3,21 @@ use wincode::{SchemaRead, SchemaWrite};
 /// What gets written to the WAL and `SSTable`s.
 #[derive(Debug, SchemaRead, SchemaWrite, Clone, PartialEq)]
 pub enum Entry {
-    Set {
-        key: String,
-        value: String,
-    },
+    /// A key holds this value.
+    Set { key: String, value: String },
     /// Tombstone.
-    Delete {
-        key: String,
-    },
+    Delete { key: String },
 }
 
 impl Entry {
+    /// The key of either variant.
     pub fn key(&self) -> &str {
         match self {
             Self::Set { key, .. } | Self::Delete { key } => key.as_str(),
         }
     }
 
+    /// The value for `Set`; `None` for `Delete`.
     pub fn value(&self) -> Option<&str> {
         match self {
             Self::Set { value, .. } => Some(value.as_str()),
@@ -27,6 +25,7 @@ impl Entry {
         }
     }
 
+    /// Builds a `Set`.
     pub fn set(key: impl Into<String>, value: impl Into<String>) -> Self {
         Self::Set {
             key: key.into(),
@@ -34,6 +33,7 @@ impl Entry {
         }
     }
 
+    /// Builds a `Delete` tombstone.
     pub fn delete(key: impl Into<String>) -> Self {
         Self::Delete { key: key.into() }
     }

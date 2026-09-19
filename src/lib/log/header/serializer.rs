@@ -1,6 +1,7 @@
 use super::MAGIC;
 use wincode::{SchemaWrite, config::DefaultConfig};
 
+/// Prepends the on-disk header to a wincode-encoded value.
 pub(super) struct Serializer;
 
 /// Use this name at call sites; it pairs with [`HeaderDeserializer`].
@@ -9,7 +10,7 @@ pub(super) struct Serializer;
 pub(super) type HeaderSerializer = Serializer;
 
 impl Serializer {
-    /// `[magic: 2B][crc32: 4B][entry_len: 4B][wincode payload]`
+    /// Encodes `value` as `[magic: 2B][crc32: 4B][entry_len: 4B][wincode payload]`.
     pub(super) fn serialize<T>(value: &T) -> anyhow::Result<Vec<u8>>
     where
         T: SchemaWrite<DefaultConfig, Src = T>,

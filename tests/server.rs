@@ -1,3 +1,9 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic
+)]
 use chickadee::{log::Log, run::Runner};
 use std::{
     io::{BufRead, BufReader, BufWriter, Write},
@@ -37,7 +43,7 @@ fn start_server() -> std::net::SocketAddr {
 
 /// Sends a command line to the server and returns the response line (trimmed).
 fn send(stream: &mut BufReader<TcpStream>, writer: &mut impl Write, cmd: &str) -> String {
-    writeln!(writer, "{}", cmd).unwrap();
+    writeln!(writer, "{cmd}").unwrap();
     writer.flush().unwrap();
     let mut response = String::new();
     stream.read_line(&mut response).unwrap();

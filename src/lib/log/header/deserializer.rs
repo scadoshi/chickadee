@@ -36,34 +36,32 @@ impl Deserializer {
     where
         T: SchemaRead<'de, DefaultConfig, Dst = T>,
     {
-        if value.len() <= HEADER_LEN as usize {
+        if value.len() <= HEADER_LEN {
             return Err(CorruptionType::NotEnoughBytes);
         }
-        let mut p: usize = 0;
-        // magic
-        let magic_bytes: [u8; 2] = value[p..p + 2].try_into().unwrap();
-        let magic = u16::from_le_bytes(magic_bytes);
-        if magic != MAGIC {
+        let (magic_bytes, rest) = value
+            .split_first_chunk::<2>()
+            .ok_or(CorruptionType::NotEnoughBytes)?;
+        if u16::from_le_bytes(*magic_bytes) != MAGIC {
             return Err(CorruptionType::MagicBytesMismatch);
         }
-        p += 2;
-        // checksum
-        let checksum_bytes: [u8; 4] = value[p..p + 4].try_into().unwrap();
-        let checksum = u32::from_le_bytes(checksum_bytes);
-        p += 4;
-        // len
-        let len_bytes: [u8; 4] = value[p..p + 4].try_into().unwrap();
-        let len = u32::from_le_bytes(len_bytes);
-        p += 4;
-        // entry
-        if value.len() < HEADER_LEN as usize + len as usize {
-            return Err(CorruptionType::NotEnoughBytes);
-        }
-        let entry_bytes = &value[p..p + len as usize];
+        let (checksum_bytes, rest) = rest
+            .split_first_chunk::<4>()
+            .ok_or(CorruptionType::NotEnoughBytes)?;
+        let checksum = u32::from_le_bytes(*checksum_bytes);
+        let (len_bytes, rest) = rest
+            .split_first_chunk::<4>()
+            .ok_or(CorruptionType::NotEnoughBytes)?;
+        let len = usize::try_from(u32::from_le_bytes(*len_bytes))
+            .map_err(|_| CorruptionType::NotEnoughBytes)?;
+        let entry_bytes = rest.get(..len).ok_or(CorruptionType::NotEnoughBytes)?;
         if checksum != crc32fast::hash(entry_bytes) {
             return Err(CorruptionType::ChecksumMismatch);
         }
         let value: T = wincode::deserialize(entry_bytes).map_err(|_| CorruptionType::ParseError)?;
-        Ok((value, HEADER_LEN as usize + len as usize))
+        let consumed = HEADER_LEN
+            .checked_add(len)
+            .ok_or(CorruptionType::NotEnoughBytes)?;
+        Ok((value, consumed))
     }
 }

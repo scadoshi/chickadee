@@ -13,8 +13,7 @@ impl Entry {
     /// Returns the key for any entry variant.
     pub fn key(&self) -> &str {
         match self {
-            Self::Set { key, .. } => key.as_str(),
-            Self::Delete { key } => key.as_str(),
+            Self::Set { key, .. } | Self::Delete { key } => key.as_str(),
         }
     }
 

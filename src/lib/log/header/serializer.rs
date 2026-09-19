@@ -18,7 +18,7 @@ impl Serializer {
     {
         let entry_bytes = wincode::serialize(value)?;
         let checksum = crc32fast::hash(&entry_bytes);
-        let len = entry_bytes.len() as u32;
+        let len = u32::try_from(entry_bytes.len())?;
         let mut bytes = Vec::<u8>::new();
         bytes.extend(MAGIC.to_le_bytes());
         bytes.extend(checksum.to_le_bytes());

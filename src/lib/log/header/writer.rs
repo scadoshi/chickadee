@@ -1,6 +1,6 @@
+use super::serializer::HeaderSerializer;
 use std::io::{Seek, SeekFrom, Write};
 use wincode::{SchemaWrite, config::DefaultConfig};
-use super::serializer::HeaderSerializer;
 
 /// Write entries with the on-disk header format:
 /// `[magic: 2B][crc32: 4B][entry_len: 4B][wincode-serialized Entry]`

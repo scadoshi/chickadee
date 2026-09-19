@@ -1,5 +1,5 @@
-use crate::log::{Log, entry::Entry, memtable::MemTable};
 use super::SSTable;
+use crate::log::{Log, entry::Entry, memtable::MemTable};
 use std::{
     cmp::Reverse,
     collections::HashSet,
@@ -7,18 +7,18 @@ use std::{
 };
 
 impl Log {
-    /// compacts all SSTables into a compactd set using a k-way compact.
+    /// compacts all `SSTables` into a compactd set using a k-way compact.
     /// Processes entries in sorted key order across all files simultaneously;
-    /// when multiple SSTables contain the same key, the newest file wins.
-    /// Intermediate output is flushed to new SSTable files when the 4 MB threshold
+    /// when multiple `SSTables` contain the same key, the newest file wins.
+    /// Intermediate output is flushed to new `SSTable` files when the 4 MB threshold
     /// is exceeded, with a final flush for any remaining entries.
-    /// All original SSTables are deleted once the compactd output is written.
+    /// All original `SSTables` are deleted once the compactd output is written.
     pub fn compact(&mut self) -> anyhow::Result<()> {
         // Get entries and sort desc by path--will correlate to most recent ordering first
         let mut entries: Vec<_> = read_dir(&self.sstables_path)?.collect::<Result<_, _>>()?;
         entries.sort_by_key(|e| Reverse(e.file_name()));
         // Use this later for cleaning up old SSTables
-        let to_delete: Vec<_> = entries.iter().map(|e| e.path()).collect();
+        let to_delete: Vec<_> = entries.iter().map(std::fs::DirEntry::path).collect();
         // Build a (Entry, File) structure so we can keep track of latest entry and File to get
         // more entries
         let sstable_opts: Vec<Option<SSTable>> = entries
@@ -31,7 +31,7 @@ impl Log {
             .map(|sst| (None::<Entry>, sst))
             .collect();
         // Initialize first entry for every file
-        for (entry, sstable) in sstables.iter_mut() {
+        for (entry, sstable) in &mut sstables {
             *entry = sstable.read_next_entry()?;
         }
         // For writing to
@@ -42,26 +42,22 @@ impl Log {
         loop {
             // Retain non-exhausted files
             sstables.retain(|(entry, _)| entry.is_some());
-            // Break if all files have been exhausted
-            if sstables.is_empty() {
+            // Find min key; none means all files have been exhausted
+            let Some(min) = sstables
+                .iter()
+                .filter_map(|(entry, _)| entry.as_ref())
+                .map(|entry| entry.key().to_owned())
+                .min()
+            else {
                 break;
-            }
-            // Find min key
-            let min = {
-                let mut min = None::<String>;
-                for (entry, _) in sstables.iter() {
-                    let curr = entry.as_ref().unwrap();
-                    if min.as_ref().is_none_or(|min| curr.key().cmp(min).is_lt()) {
-                        min = Some(curr.key().to_owned());
-                    }
-                }
-                min.unwrap()
             };
             // Write to memtable
             // First which includes min is winner; tombstone winners are dropped (not written)
             // All which include min should be advanced
-            for (entry, sstable) in sstables.iter_mut() {
-                let entry_ref = entry.as_ref().unwrap();
+            for (entry, sstable) in &mut sstables {
+                let Some(entry_ref) = entry.as_ref() else {
+                    continue;
+                };
                 let is_particpant = entry_ref.key() == min;
                 let winner_found = seen_keys.contains(min.as_str());
                 if is_particpant && !winner_found {
@@ -112,13 +108,13 @@ mod tests {
     fn compact_with_no_sstables_is_noop() {
         let (_dir, mut log) = temp_log();
         log.compact().unwrap();
-        assert!(
+        assert_eq!(
             read_dir(&log.sstables_path)
                 .unwrap()
                 .flatten()
                 .filter(|e| e.path().extension().is_some_and(|ext| ext == "sst"))
-                .count()
-                == 0
+                .count(),
+            0
         );
     }
 

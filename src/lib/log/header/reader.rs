@@ -1,6 +1,7 @@
+use super::deserializer::HeaderDeserializer;
+use anyhow::Context;
 use std::io::{Read, Seek, SeekFrom};
 use wincode::{SchemaRead, config::DefaultConfig};
-use super::deserializer::HeaderDeserializer;
 
 /// Read entries with the on-disk header format:
 /// `[magic: 2B][crc32: 4B][entry_len: 4B][wincode-serialized Entry]`
@@ -33,15 +34,16 @@ where
         }
         let mut bytes = Vec::<u8>::new();
         self.read_to_end(&mut bytes)?;
-        let mut p: usize = 0;
-        while p < bytes.len() {
-            match HeaderDeserializer::deserialize(&bytes[p..]) {
-                Ok((entry, len)) => {
-                    self.seek(SeekFrom::Start(pos + p as u64 + len as u64))?;
-                    return Ok(Some(entry));
-                }
-                // Corruption recovery: advance one byte and retry.
-                Err(_) => p += 1,
+        // Corruption recovery: on failure advance one byte and retry.
+        for p in 0..bytes.len() {
+            let Some(window) = bytes.get(p..) else { break };
+            if let Ok((entry, len)) = HeaderDeserializer::deserialize(window) {
+                let next = pos
+                    .checked_add(u64::try_from(p)?)
+                    .and_then(|n| n.checked_add(u64::try_from(len).ok()?))
+                    .context("entry offset overflows u64")?;
+                self.seek(SeekFrom::Start(next))?;
+                return Ok(Some(entry));
             }
         }
         Ok(None)

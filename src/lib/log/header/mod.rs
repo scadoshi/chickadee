@@ -3,9 +3,8 @@ pub(crate) mod reader;
 pub(crate) mod serializer;
 pub(crate) mod writer;
 
-
-/// Size of the entry header in bytes: magic (2) + crc32 (4) + entry_len (4).
-pub(super) const HEADER_LEN: u64 = 10;
+/// Size of the entry header in bytes: magic (2) + crc32 (4) + `entry_len` (4).
+pub(super) const HEADER_LEN: usize = 10;
 /// Magic bytes written at the start of every entry, used to locate entry boundaries.
 ///
 /// Serialized little-endian, so the literal is byte-swapped relative to what lands on
@@ -16,15 +15,12 @@ pub(super) const MAGIC: u16 = 0x4443;
 
 #[cfg(test)]
 mod tests {
-    use crate::log::entry::Entry;
+    #![allow(clippy::as_conversions, clippy::cast_possible_truncation)]
     use super::{
-        MAGIC,
-        deserializer::CorruptionType,
-        deserializer::HeaderDeserializer,
-        reader::HeaderReader,
-        serializer::HeaderSerializer,
-        writer::HeaderWriter,
+        MAGIC, deserializer::CorruptionType, deserializer::HeaderDeserializer,
+        reader::HeaderReader, serializer::HeaderSerializer, writer::HeaderWriter,
     };
+    use crate::log::entry::Entry;
     use std::io::{Seek, SeekFrom, Write};
 
     // --- Round-trips ---

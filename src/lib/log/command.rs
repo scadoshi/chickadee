@@ -36,15 +36,15 @@ impl TryFrom<&str> for Command {
     type Error = CommandError;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut parts = value.split_whitespace();
-        let Some(command_str) = parts.next().map(|s| s.to_lowercase()) else {
+        let Some(command_str) = parts.next().map(str::to_lowercase) else {
             return Err(Self::Error::MissingRequiredArguments);
         };
 
         match command_str.as_str() {
             "set" | "s" => {
                 let (Some(key), Some(value)) = (
-                    parts.next().map(|s| s.to_string()),
-                    parts.next().map(|s| s.to_string()),
+                    parts.next().map(std::string::ToString::to_string),
+                    parts.next().map(std::string::ToString::to_string),
                 ) else {
                     return Err(Self::Error::MissingRequiredArguments);
                 };
@@ -54,7 +54,7 @@ impl TryFrom<&str> for Command {
                 Ok(Self::Set { key, value })
             }
             "get" | "g" => {
-                let Some(key) = parts.next().map(|s| s.to_string()) else {
+                let Some(key) = parts.next().map(std::string::ToString::to_string) else {
                     return Err(Self::Error::MissingRequiredArguments);
                 };
                 if parts.next().is_some() {
@@ -63,7 +63,7 @@ impl TryFrom<&str> for Command {
                 Ok(Self::Get { key })
             }
             "delete" | "del" | "d" => {
-                let Some(key) = parts.next().map(|s| s.to_string()) else {
+                let Some(key) = parts.next().map(std::string::ToString::to_string) else {
                     return Err(Self::Error::MissingRequiredArguments);
                 };
                 if parts.next().is_some() {
@@ -125,27 +125,26 @@ impl Execute for Log {
     fn execute(&mut self, command: Command, writer: &mut impl Write) -> anyhow::Result<()> {
         match command {
             Command::Set { key, value } => {
-                writeln!(writer, "{} => {}", key, value)?;
+                writeln!(writer, "{key} => {value}")?;
                 self.write(Entry::set(key, value))?;
                 self.maybe_flush()?;
             }
             Command::Get { key } => match self.get(&key)? {
-                Some(Entry::Set { value, .. }) => writeln!(writer, "{} => {}", key, value)?,
-                None => writeln!(writer, "{} not found", key)?,
-                Some(Entry::Delete { .. }) => unreachable!("Log::get never returns Delete"),
+                Some(Entry::Set { value, .. }) => writeln!(writer, "{key} => {value}")?,
+                Some(Entry::Delete { .. }) | None => writeln!(writer, "{key} not found")?,
             },
             Command::Delete { key } => {
                 // Only write tombstone if key exists, avoids unnecessary log growth.
                 if self.contains(&key)? {
-                    writeln!(writer, "{} deleted", key)?;
+                    writeln!(writer, "{key} deleted")?;
                     self.write(Entry::delete(key))?;
                 } else {
-                    writeln!(writer, "{} not found", key)?;
+                    writeln!(writer, "{key} not found")?;
                 }
                 self.maybe_flush()?;
             }
             // Quit logic handled in run loop to avoid hard exit
-            Command::Quit => unreachable!("Run loop breaks before execute"),
+            Command::Quit => anyhow::bail!("quit must be handled by the run loop"),
             Command::Help => writeln!(writer, "{}", tui::command_hint())?,
         }
 

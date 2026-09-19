@@ -25,6 +25,10 @@ where
         Self { reader, writer }
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "callers hand over their own Arc clone; keeping the signature avoids an API change"
+    )]
     pub fn run(&mut self, log: Arc<Mutex<Log>>) -> anyhow::Result<()> {
         let mut line = String::new();
         loop {
@@ -35,10 +39,12 @@ where
             match Command::try_from(line.trim()) {
                 Ok(Command::Quit) => break,
                 Ok(cmd) => {
-                    let mut guard = log.lock().unwrap();
-                    guard.execute(cmd, &mut self.writer)?
+                    let mut guard = log
+                        .lock()
+                        .map_err(|_| anyhow::anyhow!("log mutex poisoned"))?;
+                    guard.execute(cmd, &mut self.writer)?;
                 }
-                Err(e) => writeln!(self.writer, "Error: {}", e)?,
+                Err(e) => writeln!(self.writer, "Error: {e}")?,
             }
             self.writer.flush()?;
         }

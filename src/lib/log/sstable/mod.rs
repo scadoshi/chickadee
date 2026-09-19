@@ -3,6 +3,7 @@ pub(super) mod compact;
 
 use self::bloom_filter::{BloomFilter, BloomFilterReader};
 use super::{entry::Entry, header::reader::HeaderReader};
+use anyhow::Context;
 use std::{fs::File, io::Seek, path::Path};
 
 /// An immutable, on-disk sorted table of key-value entries produced by flushing the memtable.
@@ -17,14 +18,21 @@ pub(super) struct SSTable {
 }
 
 impl SSTable {
-    /// Opens an SSTable at `path`, reads its bloom-filter footer, and positions the cursor at
+    /// Opens an `SSTable` at `path`, reads its bloom-filter footer, and positions the cursor at
     /// the first entry. Returns `None` if the file is too small or contains no valid entries.
     pub(super) fn from_path(path: impl AsRef<Path>) -> anyhow::Result<Option<Self>> {
         let mut file = File::open(path.as_ref())?;
         let Some(bloom_filter) = file.read_bloom_filter()? else {
             return Ok(None);
         };
-        let bloom_filter_pos = file.metadata()?.len() - bloom_filter.len() as u64 - 4;
+        let footer_len = u64::try_from(bloom_filter.len())?
+            .checked_add(4)
+            .context("bloom filter footer too large")?;
+        let bloom_filter_pos = file
+            .metadata()?
+            .len()
+            .checked_sub(footer_len)
+            .context("sstable shorter than its bloom filter footer")?;
         if !HeaderReader::<Entry>::header_has_at_least_one(&mut file)? {
             return Ok(None);
         }

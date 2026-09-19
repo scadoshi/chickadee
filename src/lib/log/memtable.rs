@@ -3,6 +3,7 @@ use super::{
     header::{reader::HeaderReader, writer::HeaderWriter},
     sstable::bloom_filter::BloomFilter,
 };
+use anyhow::Context;
 use std::{
     collections::{BTreeMap, btree_map::Values},
     fs::{File, OpenOptions},
@@ -18,7 +19,7 @@ pub(crate) struct MemTable {
     size: u64,
 }
 
-/// Size threshold in mebibytes above which the memtable should be flushed to an SSTable.
+/// Size threshold in mebibytes above which the memtable should be flushed to an `SSTable`.
 pub(super) const FLUSH_THRESHOLD_MB: u64 = 4;
 
 impl MemTable {
@@ -39,7 +40,7 @@ impl MemTable {
         Ok(memtable)
     }
 
-    /// Total estimated byte size of all entries, used to trigger SSTable flushes.
+    /// Total estimated byte size of all entries, used to trigger `SSTable` flushes.
     pub(crate) fn size(&self) -> u64 {
         self.size
     }
@@ -48,10 +49,16 @@ impl MemTable {
     /// Returns the previous entry for the key, if any.
     pub(crate) fn process(&mut self, entry: Entry) -> anyhow::Result<Option<Entry>> {
         if let Some(previous) = self.inner.get(entry.key()) {
-            self.size -= previous.key().len() as u64 + wincode::serialize(&previous)?.len() as u64;
+            self.size = self.size.saturating_sub(Self::entry_size(previous)?);
         }
-        self.size += entry.key().len() as u64 + wincode::serialize(&entry)?.len() as u64;
+        self.size = self.size.saturating_add(Self::entry_size(&entry)?);
         Ok(self.inner.insert(entry.key().to_owned(), entry))
+    }
+
+    fn entry_size(entry: &Entry) -> anyhow::Result<u64> {
+        let key_len = u64::try_from(entry.key().len())?;
+        let payload_len = u64::try_from(wincode::serialize(entry)?.len())?;
+        Ok(key_len.saturating_add(payload_len))
     }
 
     /// Returns `true` if the memtable has exceeded the 4 MB flush threshold.
@@ -59,7 +66,7 @@ impl MemTable {
         self.size() > FLUSH_THRESHOLD_MB * (1 << 20)
     }
 
-    /// Writes all entries in sorted key order to a new timestamped SSTable file in `path`, then clears the memtable.
+    /// Writes all entries in sorted key order to a new timestamped `SSTable` file in `path`, then clears the memtable.
     pub(crate) fn flush_to(&mut self, mut path: PathBuf) -> anyhow::Result<()> {
         // Insurance
         if self.is_empty() {
@@ -69,22 +76,25 @@ impl MemTable {
         std::fs::create_dir_all(&path)?;
         // Generate timestamp file name
         let ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_micros();
-        path.push(format!("{:020}.sst", ts));
+        path.push(format!("{ts:020}.sst"));
         let mut file = OpenOptions::new()
             .truncate(true)
             .create(true)
             .write(true)
             .open(path)?;
         // 10 bits per key is ideal for k=7
-        let bit_count: u32 = self.len() as u32 * 10;
-        let mut bloom_filter = BloomFilter::new(bit_count as usize);
+        let bit_count = self
+            .len()
+            .checked_mul(10)
+            .context("bloom filter bit count overflow")?;
+        let mut bloom_filter = BloomFilter::new(bit_count);
         for entry in self.values() {
             file.header_write(entry)?;
             bloom_filter.insert(entry.key().as_bytes());
         }
         // Write bloomfilter and bit_count
         file.write_all(&bloom_filter)?;
-        file.write_all(&bit_count.to_le_bytes())?;
+        file.write_all(&u32::try_from(bit_count)?.to_le_bytes())?;
         // Trigger fsync
         file.sync_all()?;
         self.clear();
@@ -95,7 +105,7 @@ impl MemTable {
     /// Removes all entries and resets byte size to zero.
     pub(crate) fn clear(&mut self) {
         self.size = 0;
-        self.inner.clear()
+        self.inner.clear();
     }
 
     /// Number of unique keys currently in the memtable.
@@ -120,13 +130,20 @@ impl MemTable {
     }
 
     /// Iterates over all entries in ascending key order.
-    pub(crate) fn values<'a>(&'a self) -> Values<'a, String, Entry> {
+    pub(crate) fn values(&self) -> Values<'_, String, Entry> {
         self.inner.values()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        clippy::arithmetic_side_effects
+    )]
     use super::*;
     use crate::log::{Log, header::writer::HeaderWriter};
     use std::{fs::read_dir, io::Read};

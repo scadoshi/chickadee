@@ -1,3 +1,4 @@
+use anyhow::Context;
 use std::{
     io::{Read, Seek, SeekFrom},
     ops::{Deref, DerefMut},
@@ -9,7 +10,7 @@ use std::{
 /// A key is definitely absent if any of its positions is unset; it may be present
 /// if all positions are set (false positives are possible, false negatives are not).
 ///
-/// The filter is serialized as a footer at the end of each SSTable file:
+/// The filter is serialized as a footer at the end of each `SSTable` file:
 /// `[filter_bytes][bit_count: u32 le]`.
 #[derive(Debug)]
 pub(crate) struct BloomFilter {
@@ -37,7 +38,11 @@ impl DerefMut for BloomFilter {
 fn positions(key: &[u8], bit_count: usize) -> impl Iterator<Item = usize> {
     let h1 = xxh3::hash64_with_seed(key, 0);
     let h2 = xxh3::hash64_with_seed(key, 1);
-    (0..7).map(move |i| (h1.wrapping_add((i as u64).wrapping_mul(h2)) % bit_count as u64) as usize)
+    let bit_count = u64::try_from(bit_count).unwrap_or(u64::MAX);
+    (0..7u64).filter_map(move |i| {
+        let pos = h1.wrapping_add(i.wrapping_mul(h2)).checked_rem(bit_count)?;
+        usize::try_from(pos).ok()
+    })
 }
 
 impl BloomFilter {
@@ -55,7 +60,9 @@ impl BloomFilter {
     /// Records `key` in the filter by setting all 7 of its bit positions.
     pub(crate) fn insert(&mut self, key: &[u8]) {
         for pos in positions(key, self.bit_count) {
-            self[pos / 8] |= 1 << (pos % 8);
+            if let Some(byte) = self.get_mut(pos / 8) {
+                *byte |= 1 << (pos % 8);
+            }
         }
     }
 
@@ -63,11 +70,14 @@ impl BloomFilter {
     ///
     /// A `true` result can be a false positive; a `false` result is always correct.
     pub(crate) fn may_contain(&self, key: &[u8]) -> bool {
-        positions(key, self.bit_count).all(|pos| self[pos / 8] & 1 << (pos % 8) != 0)
+        positions(key, self.bit_count).all(|pos| {
+            self.get(pos / 8)
+                .is_none_or(|byte| byte & 1 << (pos % 8) != 0)
+        })
     }
 }
 
-/// Extension trait for reading a [`BloomFilter`] from the footer of an SSTable file.
+/// Extension trait for reading a [`BloomFilter`] from the footer of an `SSTable` file.
 ///
 /// The footer layout (written from the end of the file backward) is:
 /// - 4 bytes: `bit_count` as `u32` little-endian
@@ -88,22 +98,19 @@ impl<R: Read + Seek> BloomFilterReader for R {
             return Ok(None);
         }
         self.seek(SeekFrom::End(-4))?;
-        let (bit_count, byte_count) = {
-            let mut bytes = Vec::<u8>::new();
-            self.read_to_end(&mut bytes)?;
-            let bit_count = u32::from_le_bytes(bytes.as_slice().try_into().unwrap()) as usize;
-            let byte_count = bit_count.div_ceil(8);
-            (bit_count, byte_count)
-        };
-        if size < 4 + byte_count as u64 {
+        let mut bit_count_bytes = [0u8; 4];
+        self.read_exact(&mut bit_count_bytes)?;
+        let bit_count = usize::try_from(u32::from_le_bytes(bit_count_bytes))?;
+        let byte_count = bit_count.div_ceil(8);
+        let footer_len = u64::try_from(byte_count)?
+            .checked_add(4)
+            .context("bloom filter footer too large")?;
+        let Some(filter_start) = size.checked_sub(footer_len) else {
             return Ok(None);
-        }
-        self.seek(SeekFrom::End(-(byte_count as i64) - 4))?;
-        let inner: Vec<u8> = {
-            let mut bytes = Vec::<u8>::new();
-            self.read_to_end(&mut bytes)?;
-            bytes.into_iter().take(byte_count).collect()
         };
+        self.seek(SeekFrom::Start(filter_start))?;
+        let mut inner = vec![0u8; byte_count];
+        self.read_exact(&mut inner)?;
         self.seek(SeekFrom::Start(0))?;
         Ok(Some(BloomFilter { bit_count, inner }))
     }

@@ -12,7 +12,7 @@ fn server() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     let address = std::env::var("ADDRESS")?;
     let port = std::env::var("PORT")?;
-    let bind_address = format!("{}:{}", address, port);
+    let bind_address = format!("{address}:{port}");
     let log = Arc::new(Mutex::new(Log::new(
         DATA_PATH,
         WAL_PATH,
@@ -33,7 +33,7 @@ fn server() -> anyhow::Result<()> {
             let writer = BufWriter::new(stream);
             let mut runner = Runner::new(reader, writer);
             if let Err(e) = runner.run(log) {
-                eprintln!("Connection error: {}", e)
+                eprintln!("Connection error: {e}");
             }
         });
     }
@@ -42,6 +42,6 @@ fn server() -> anyhow::Result<()> {
 
 fn main() {
     if let Err(e) = server() {
-        eprintln!("{}", e);
+        eprintln!("{e}");
     }
 }

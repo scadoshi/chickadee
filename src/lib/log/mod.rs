@@ -20,9 +20,9 @@ use std::{
 pub const DATA_PATH: &str = "data";
 /// Path to the write-ahead log (WAL) file.
 pub const WAL_PATH: &str = "data/wal";
-/// Directory containing flushed SSTable files.
+/// Directory containing flushed `SSTable` files.
 pub const SSTABLES_PATH: &str = "data/sstables";
-/// Multiple which flush_count is checked against in order to determine compaction timing
+/// Multiple which `flush_count` is checked against in order to determine compaction timing
 const COMPACT_EVERY_N_FLUSHES: u64 = 10;
 
 /// Append-only log store. Owns the data file and in-memory key-to-entry memtable.
@@ -58,9 +58,11 @@ impl Log {
             .open(&wal_path)?;
         let memtable = MemTable::from_file(&mut wal_file)?;
         // SSTable count equates to flush count
-        let flush_count = read_dir(&sstables_path)?
-            .collect::<Result<Vec<_>, _>>()?
-            .len() as u64;
+        let flush_count = u64::try_from(
+            read_dir(&sstables_path)?
+                .collect::<Result<Vec<_>, _>>()?
+                .len(),
+        )?;
         // Return
         Ok(Self {
             wal_file,
@@ -78,7 +80,7 @@ impl Log {
         Ok(())
     }
 
-    /// Looks up a key: checks the memtable first, then scans SSTables newest-to-oldest.
+    /// Looks up a key: checks the memtable first, then scans `SSTables` newest-to-oldest.
     /// Returns `None` if the key is absent or deleted in either layer.
     pub fn get(&self, key: impl AsRef<str>) -> anyhow::Result<Option<Entry>> {
         // Try memtable first
@@ -111,25 +113,25 @@ impl Log {
         Ok(None)
     }
 
-    /// Returns `true` if `key` exists in the memtable or any SSTable.
+    /// Returns `true` if `key` exists in the memtable or any `SSTable`.
     pub fn contains(&self, key: impl AsRef<str>) -> anyhow::Result<bool> {
         self.get(key).map(|o| o.is_some())
     }
 
-    /// Writes all memtable entries sorted by key to a new timestamped SSTable file,
+    /// Writes all memtable entries sorted by key to a new timestamped `SSTable` file,
     /// then truncates the WAL and clears the memtable.
     pub fn flush(&mut self) -> anyhow::Result<()> {
         self.memtable.flush_to(self.sstables_path.clone())?;
         self.wal_file.set_len(0)?;
         self.wal_file.seek(SeekFrom::Start(0))?;
-        self.flush_count += 1;
+        self.flush_count = self.flush_count.saturating_add(1);
         if self.flush_count.is_multiple_of(COMPACT_EVERY_N_FLUSHES) {
             self.compact()?;
         }
         Ok(())
     }
 
-    /// Flushes to an SSTable if the memtable has exceeded the 4 MB size threshold.
+    /// Flushes to an `SSTable` if the memtable has exceeded the 4 MB size threshold.
     pub fn maybe_flush(&mut self) -> anyhow::Result<()> {
         if self.memtable.should_flush() {
             self.flush()
@@ -218,7 +220,7 @@ mod tests {
         log.flush().unwrap();
         let sst_exists = read_dir(log.sstables_path)
             .unwrap()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .any(|e| e.path().extension().is_some_and(|ext| ext == "sst"));
         assert!(sst_exists);
     }
@@ -236,7 +238,7 @@ mod tests {
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();
-        assert!(log.wal_file.metadata().unwrap().len() == 0);
+        assert_eq!(log.wal_file.metadata().unwrap().len(), 0);
     }
 
     #[test]
@@ -249,7 +251,7 @@ mod tests {
         let sst_exists = read_dir(&log.sstables_path)
             .into_iter()
             .flatten()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
             .any(|e| e.path().extension().is_some_and(|ext| ext == "sst"));
         assert!(!sst_exists);
     }

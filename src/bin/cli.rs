@@ -22,6 +22,6 @@ fn repl() -> anyhow::Result<()> {
 
 fn main() {
     if let Err(e) = repl() {
-        eprintln!("{}", e);
+        eprintln!("{e}");
     }
 }

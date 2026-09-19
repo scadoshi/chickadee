@@ -4,14 +4,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-/// Probabilistic membership filter backed by a fixed-size bit array.
+/// Bit array with `k = 7` positions per key. Any unset position means the key is absent;
+/// all set means it may be present.
 ///
-/// Uses double hashing (two xxh3 seeds) to derive `k = 7` bit positions per key.
-/// A key is definitely absent if any of its positions is unset; it may be present
-/// if all positions are set (false positives are possible, false negatives are not).
-///
-/// The filter is serialized as a footer at the end of each `SSTable` file:
-/// `[filter_bytes][bit_count: u32 le]`.
+/// Stored as a footer at the end of each `SSTable` file: `[filter_bytes][bit_count: u32 le]`.
 #[derive(Debug)]
 pub(crate) struct BloomFilter {
     bit_count: usize,
@@ -31,10 +27,8 @@ impl DerefMut for BloomFilter {
     }
 }
 
-/// Returns an iterator over the `k = 7` bit positions for `key` within a filter of `bit_count` bits.
-///
-/// Uses enhanced double hashing: `pos_i = (h1 + i * h2) % bit_count`, where `h1` and `h2`
-/// are xxh3-64 hashes of the key with seeds 0 and 1 respectively.
+/// Enhanced double hashing: `pos_i = (h1 + i * h2) % bit_count`, with `h1` and `h2` being
+/// xxh3-64 of the key under seeds 0 and 1.
 fn positions(key: &[u8], bit_count: usize) -> impl Iterator<Item = usize> {
     let h1 = xxh3::hash64_with_seed(key, 0);
     let h2 = xxh3::hash64_with_seed(key, 1);
@@ -46,9 +40,7 @@ fn positions(key: &[u8], bit_count: usize) -> impl Iterator<Item = usize> {
 }
 
 impl BloomFilter {
-    /// Creates a new empty filter sized for `bit_count` bits (rounded up to the nearest byte).
-    ///
-    /// For `k = 7` hash functions, `10 bits per key` gives a false-positive rate of ~0.8%.
+    /// At 10 bits per key, `k = 7` gives about 0.8% false positives.
     pub(crate) fn new(bit_count: usize) -> Self {
         let byte_count = bit_count.div_ceil(8);
         Self {
@@ -57,7 +49,6 @@ impl BloomFilter {
         }
     }
 
-    /// Records `key` in the filter by setting all 7 of its bit positions.
     pub(crate) fn insert(&mut self, key: &[u8]) {
         for pos in positions(key, self.bit_count) {
             if let Some(byte) = self.get_mut(pos / 8) {
@@ -66,9 +57,7 @@ impl BloomFilter {
         }
     }
 
-    /// Returns `true` if `key` **may** be in the set, `false` if it is **definitely absent**.
-    ///
-    /// A `true` result can be a false positive; a `false` result is always correct.
+    /// `true` can be a false positive. `false` is always right.
     pub(crate) fn may_contain(&self, key: &[u8]) -> bool {
         positions(key, self.bit_count).all(|pos| {
             self.get(pos / 8)
@@ -77,16 +66,10 @@ impl BloomFilter {
     }
 }
 
-/// Extension trait for reading a [`BloomFilter`] from the footer of an `SSTable` file.
-///
-/// The footer layout (written from the end of the file backward) is:
-/// - 4 bytes: `bit_count` as `u32` little-endian
-/// - `bit_count.div_ceil(8)` bytes: the filter bit array
+/// Read from the end of the file backward: the last 4 bytes are `bit_count` as a
+/// little-endian `u32`, and the `bit_count.div_ceil(8)` bytes before that are the filter.
 pub(super) trait BloomFilterReader: Read + Seek {
-    /// Reads the bloom filter footer from the current file.
-    ///
-    /// Returns `None` if the file is too small to hold a valid footer.
-    /// On success resets the cursor to the start of the file.
+    /// `None` if the file is too small for a footer. Leaves the cursor at the start of the file.
     fn read_bloom_filter(&mut self) -> anyhow::Result<Option<BloomFilter>>;
 }
 

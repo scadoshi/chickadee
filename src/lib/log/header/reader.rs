@@ -3,16 +3,15 @@ use anyhow::Context;
 use std::io::{Read, Seek, SeekFrom};
 use wincode::{SchemaRead, config::DefaultConfig};
 
-/// Read entries with the on-disk header format:
-/// `[magic: 2B][crc32: 4B][entry_len: 4B][wincode-serialized Entry]`
+/// Reads the record format written by [`HeaderWriter`](super::writer::HeaderWriter).
 pub(crate) trait HeaderReader<T>
 where
     T: for<'de> SchemaRead<'de, DefaultConfig, Dst = T>,
 {
-    /// Reads the next valid entry from the current cursor position.
-    /// Scans byte-by-byte on corruption to find the next valid magic + checksum match.
+    /// Next valid entry from the cursor. On corruption it walks forward a byte at a time
+    /// until magic and checksum both line up again.
     fn header_read_next(&mut self) -> anyhow::Result<Option<T>>;
-    /// Returns `true` if the file contains at least one valid entry, without moving the cursor.
+    /// Does not move the cursor.
     fn header_has_at_least_one(&mut self) -> anyhow::Result<bool>;
 }
 
@@ -34,7 +33,6 @@ where
         }
         let mut bytes = Vec::<u8>::new();
         self.read_to_end(&mut bytes)?;
-        // Corruption recovery: on failure advance one byte and retry.
         for p in 0..bytes.len() {
             let Some(window) = bytes.get(p..) else { break };
             if let Ok((entry, len)) = HeaderDeserializer::deserialize(window) {

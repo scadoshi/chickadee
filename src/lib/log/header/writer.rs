@@ -2,13 +2,12 @@ use super::serializer::HeaderSerializer;
 use std::io::{Seek, SeekFrom, Write};
 use wincode::{SchemaWrite, config::DefaultConfig};
 
-/// Write entries with the on-disk header format:
-/// `[magic: 2B][crc32: 4B][entry_len: 4B][wincode-serialized Entry]`
+/// On-disk record format: `[magic: 2B][crc32: 4B][entry_len: 4B][wincode payload]`.
 pub(crate) trait HeaderWriter<T>
 where
     T: SchemaWrite<DefaultConfig, Src = T>,
 {
-    /// Appends an entry with header to end of file.
+    /// Always appends, whatever the cursor was doing.
     fn header_write(&mut self, value: &T) -> anyhow::Result<()>;
 }
 

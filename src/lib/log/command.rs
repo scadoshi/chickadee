@@ -3,32 +3,23 @@ use crate::tui;
 use std::io::Write;
 use thiserror::Error;
 
-/// Errors from parsing user input into a command.
 #[derive(Debug, Error)]
 pub enum CommandError {
-    /// Unrecognized command name.
     #[error("unrecognized command")]
     UnrecognizedCommand,
-    /// Missing required arguments.
     #[error("missing required arguments")]
     MissingRequiredArguments,
-    /// Extra arguments provided.
     #[error("too many arguments")]
     TooManyArguments,
 }
 
-/// A parsed user command. Not all variants produce log entries (e.g. Quit, Help).
+/// A parsed line of user input. `Quit` and `Help` never touch the log.
 #[derive(Debug)]
 pub enum Command {
-    /// Store a key-value pair.
     Set { key: String, value: String },
-    /// Retrieve the value for a key.
     Get { key: String },
-    /// Remove a key.
     Delete { key: String },
-    /// Exit the REPL.
     Quit,
-    /// Print available commands.
     Help,
 }
 
@@ -79,7 +70,6 @@ impl TryFrom<&str> for Command {
 }
 
 impl Command {
-    /// Constructs a `Set` command.
     pub fn set(key: impl Into<String>, value: impl Into<String>) -> Self {
         Self::Set {
             key: key.into(),
@@ -87,17 +77,14 @@ impl Command {
         }
     }
 
-    /// Constructs a `Get` command.
     pub fn get(key: impl Into<String>) -> Self {
         Self::Get { key: key.into() }
     }
 
-    /// Constructs a `Delete` command.
     pub fn delete(key: impl Into<String>) -> Self {
         Self::Delete { key: key.into() }
     }
 
-    /// Returns the key for commands that carry one (`Set`, `Get`, `Delete`), `None` otherwise.
     pub fn key(&self) -> Option<&str> {
         match self {
             Self::Set { key, .. } | Self::Get { key } | Self::Delete { key } => Some(key.as_str()),
@@ -105,7 +92,6 @@ impl Command {
         }
     }
 
-    /// Returns the value for `Set` commands, `None` for all others.
     pub fn value(&self) -> Option<&str> {
         match self {
             Self::Set { value, .. } => Some(value.as_str()),
@@ -114,10 +100,8 @@ impl Command {
     }
 }
 
-/// Runs a command against a log store. Separated from `Log` so command
-/// handling logic lives alongside the `Command` type.
+/// Implemented here rather than on `Log` so command handling sits next to `Command`.
 pub trait Execute {
-    /// Dispatches a command: reads/writes the log and prints results.
     fn execute(&mut self, command: Command, writer: &mut impl Write) -> anyhow::Result<()>;
 }
 
@@ -134,7 +118,7 @@ impl Execute for Log {
                 Some(Entry::Delete { .. }) | None => writeln!(writer, "{key} not found")?,
             },
             Command::Delete { key } => {
-                // Only write tombstone if key exists, avoids unnecessary log growth.
+                // No tombstone for a key we never had, so misses don't grow the log.
                 if self.contains(&key)? {
                     writeln!(writer, "{key} deleted")?;
                     self.write(Entry::delete(key))?;
@@ -143,7 +127,7 @@ impl Execute for Log {
                 }
                 self.maybe_flush()?;
             }
-            // Quit logic handled in run loop to avoid hard exit
+            // The run loop breaks on Quit, so nothing here ever has to exit the process.
             Command::Quit => anyhow::bail!("quit must be handled by the run loop"),
             Command::Help => writeln!(writer, "{}", tui::command_hint())?,
         }

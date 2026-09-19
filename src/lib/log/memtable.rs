@@ -12,25 +12,23 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-/// In-memory sorted map of the most recent entry per key. Tracks byte size for flush triggering.
+/// Newest entry per key, sorted. Tracks its own byte size so the log knows when to flush.
 #[derive(Debug)]
 pub(crate) struct MemTable {
     inner: BTreeMap<String, Entry>,
     size: u64,
 }
 
-/// Size threshold in mebibytes above which the memtable should be flushed to an `SSTable`.
 pub(super) const FLUSH_THRESHOLD_MB: u64 = 4;
 
 impl MemTable {
-    /// Creates a new empty `MemTable` with zero tracked size.
     pub(crate) fn new() -> Self {
         let inner = BTreeMap::<String, Entry>::new();
         let size = 0;
         Self { inner, size }
     }
 
-    /// Rebuilds a `MemTable` by replaying all entries from the beginning of `file`.
+    /// Replays `file` from the start.
     pub(crate) fn from_file(file: &mut File) -> anyhow::Result<Self> {
         let mut memtable = Self::new();
         file.seek(SeekFrom::Start(0))?;
@@ -40,13 +38,12 @@ impl MemTable {
         Ok(memtable)
     }
 
-    /// Total estimated byte size of all entries, used to trigger `SSTable` flushes.
+    /// An estimate: key length plus serialized entry length, not the `BTreeMap`'s footprint.
     pub(crate) fn size(&self) -> u64 {
         self.size
     }
 
-    /// Applies an entry: inserts for both `Set` and `Delete` (tombstone). Updates byte size tracking.
-    /// Returns the previous entry for the key, if any.
+    /// Tombstones are stored like any other entry. Returns whatever the key held before.
     pub(crate) fn process(&mut self, entry: Entry) -> anyhow::Result<Option<Entry>> {
         if let Some(previous) = self.inner.get(entry.key()) {
             self.size = self.size.saturating_sub(Self::entry_size(previous)?);
@@ -61,20 +58,16 @@ impl MemTable {
         Ok(key_len.saturating_add(payload_len))
     }
 
-    /// Returns `true` if the memtable has exceeded the 4 MB flush threshold.
     pub(crate) fn should_flush(&self) -> bool {
         self.size() > FLUSH_THRESHOLD_MB * (1 << 20)
     }
 
-    /// Writes all entries in sorted key order to a new timestamped `SSTable` file in `path`, then clears the memtable.
+    /// Writes a new timestamped `SSTable` under `path`, then clears the memtable.
     pub(crate) fn flush_to(&mut self, mut path: PathBuf) -> anyhow::Result<()> {
-        // Insurance
         if self.is_empty() {
             return Ok(());
         }
-        // Ensure file exists
         std::fs::create_dir_all(&path)?;
-        // Generate timestamp file name
         let ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_micros();
         path.push(format!("{ts:020}.sst"));
         let mut file = OpenOptions::new()
@@ -92,44 +85,35 @@ impl MemTable {
             file.header_write(entry)?;
             bloom_filter.insert(entry.key().as_bytes());
         }
-        // Write bloomfilter and bit_count
         file.write_all(&bloom_filter)?;
         file.write_all(&u32::try_from(bit_count)?.to_le_bytes())?;
-        // Trigger fsync
         file.sync_all()?;
         self.clear();
-        // Return
         Ok(())
     }
 
-    /// Removes all entries and resets byte size to zero.
     pub(crate) fn clear(&mut self) {
         self.size = 0;
         self.inner.clear();
     }
 
-    /// Number of unique keys currently in the memtable.
     pub(crate) fn len(&self) -> usize {
         self.inner.len()
     }
 
-    /// Returns `true` if the memtable holds no entries and has zero tracked size.
     pub(crate) fn is_empty(&self) -> bool {
         self.size == 0 && self.inner.is_empty()
     }
 
-    /// Returns `true` if `key` is present in the memtable.
     #[cfg(test)]
     pub(crate) fn contains_key(&self, key: impl AsRef<str>) -> bool {
         self.inner.contains_key(key.as_ref())
     }
 
-    /// Returns a reference to the entry for `key`, or `None` if absent.
     pub(crate) fn get(&self, key: impl AsRef<str>) -> Option<&Entry> {
         self.inner.get(key.as_ref())
     }
 
-    /// Iterates over all entries in ascending key order.
     pub(crate) fn values(&self) -> Values<'_, String, Entry> {
         self.inner.values()
     }
@@ -357,9 +341,9 @@ mod tests {
             file.seek(SeekFrom::End(-(byte_count as i64) - 4)).unwrap();
             (bit_count, byte_count)
         };
-        // bit count should equals key count multiplied by ten
+        // three keys at ten bits each
         assert_eq!(bit_count, 30);
-        // byte count rounds up to the nearest byte from there
+        // 30 bits rounds up to 4 bytes
         assert_eq!(byte_count, 4);
     }
 

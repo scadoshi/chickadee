@@ -16,16 +16,12 @@ use std::{
     path::PathBuf,
 };
 
-/// Root directory for all persisted data.
 pub const DATA_PATH: &str = "data";
-/// Path to the write-ahead log (WAL) file.
 pub const WAL_PATH: &str = "data/wal";
-/// Directory containing flushed `SSTable` files.
 pub const SSTABLES_PATH: &str = "data/sstables";
-/// Multiple which `flush_count` is checked against in order to determine compaction timing
 const COMPACT_EVERY_N_FLUSHES: u64 = 10;
 
-/// Append-only log store. Owns the data file and in-memory key-to-entry memtable.
+/// Owns the WAL and the memtable. `SSTable`s stay on disk under `sstables_path`.
 #[derive(Debug)]
 pub struct Log {
     wal_file: File,
@@ -35,21 +31,18 @@ pub struct Log {
 }
 
 impl Log {
-    /// Opens or creates a log file and rebuilds the memtable from its contents. Takes truncate flag
-    /// informing whether to overwrite or append existing file content.
+    /// `truncate` wipes an existing WAL instead of replaying it.
     pub fn new(
         data_path: impl Into<PathBuf>,
         wal_path: impl Into<PathBuf>,
         sstables_path: impl Into<PathBuf>,
         truncate: bool,
     ) -> anyhow::Result<Self> {
-        // Initialize paths and dirs
         let data_path = data_path.into();
         let wal_path = wal_path.into();
         let sstables_path = sstables_path.into();
         create_dir_all(&data_path)?;
         create_dir_all(&sstables_path)?;
-        // Open WAL and initialize memtable
         let mut wal_file = OpenOptions::new()
             .create(true)
             .truncate(truncate)
@@ -57,13 +50,12 @@ impl Log {
             .write(true)
             .open(&wal_path)?;
         let memtable = MemTable::from_file(&mut wal_file)?;
-        // SSTable count equates to flush count
+        // One SSTable per flush, so the file count is the flush count.
         let flush_count = u64::try_from(
             read_dir(&sstables_path)?
                 .collect::<Result<Vec<_>, _>>()?
                 .len(),
         )?;
-        // Return
         Ok(Self {
             wal_file,
             memtable,
@@ -72,7 +64,7 @@ impl Log {
         })
     }
 
-    /// Appends an entry with header to the WAL and syncs to disk, then applies it to the memtable.
+    /// WAL first, fsync, then memtable.
     pub fn write(&mut self, entry: Entry) -> anyhow::Result<()> {
         self.wal_file.header_write(&entry)?;
         self.wal_file.sync_all()?;
@@ -80,18 +72,15 @@ impl Log {
         Ok(())
     }
 
-    /// Looks up a key: checks the memtable first, then scans `SSTables` newest-to-oldest.
-    /// Returns `None` if the key is absent or deleted in either layer.
+    /// Memtable first, then `SSTable`s newest to oldest. A tombstone in either layer means `None`.
     pub fn get(&self, key: impl AsRef<str>) -> anyhow::Result<Option<Entry>> {
-        // Try memtable first
         if let Some(entry) = self.memtable.get(key.as_ref()) {
             return match entry {
                 Entry::Set { .. } => Ok(Some(entry.clone())),
                 Entry::Delete { .. } => Ok(None),
             };
         }
-        // Then if not found sift through SSTables
-        // Only does linear search for now
+        // Linear scan of each candidate SSTable for now.
         let mut dir_entries: Vec<_> =
             read_dir(&self.sstables_path)?.collect::<Result<Vec<_>, _>>()?;
         dir_entries.sort_by_key(|e| Reverse(e.file_name()));
@@ -113,13 +102,12 @@ impl Log {
         Ok(None)
     }
 
-    /// Returns `true` if `key` exists in the memtable or any `SSTable`.
     pub fn contains(&self, key: impl AsRef<str>) -> anyhow::Result<bool> {
         self.get(key).map(|o| o.is_some())
     }
 
-    /// Writes all memtable entries sorted by key to a new timestamped `SSTable` file,
-    /// then truncates the WAL and clears the memtable.
+    /// Flushes the memtable to a new `SSTable`, truncates the WAL, and compacts every
+    /// `COMPACT_EVERY_N_FLUSHES` flushes.
     pub fn flush(&mut self) -> anyhow::Result<()> {
         self.memtable.flush_to(self.sstables_path.clone())?;
         self.wal_file.set_len(0)?;
@@ -131,7 +119,6 @@ impl Log {
         Ok(())
     }
 
-    /// Flushes to an `SSTable` if the memtable has exceeded the 4 MB size threshold.
     pub fn maybe_flush(&mut self) -> anyhow::Result<()> {
         if self.memtable.should_flush() {
             self.flush()
@@ -278,9 +265,8 @@ mod tests {
 
     #[test]
     fn get_returns_none_after_flush_and_delete() {
-        // Regression: tombstone resurrection bug. Before the fix, deleting a key that had already
-        // been flushed to an SSTable would only clear the memtable; the SSTable still contained
-        // the Set entry, so a subsequent get() would find and return it.
+        // Regression: deleting a key already flushed to an SSTable used to only clear the
+        // memtable, so get() found the old Set in the SSTable.
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();
@@ -290,8 +276,6 @@ mod tests {
 
     #[test]
     fn get_skips_sstable_when_bloom_filter_says_absent() {
-        // If the bloom filter definitively says a key is absent, the SSTable is not scanned.
-        // The result must still be None.
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();
@@ -300,8 +284,6 @@ mod tests {
 
     #[test]
     fn get_finds_key_when_bloom_filter_says_maybe_present() {
-        // When the bloom filter reports a key may be present, the SSTable is scanned and the
-        // entry is returned.
         let (_dir, mut log) = temp_log();
         let set = Entry::set("a", "1");
         log.write(set.clone()).unwrap();

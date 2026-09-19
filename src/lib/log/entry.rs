@@ -1,23 +1,25 @@
 use wincode::{SchemaRead, SchemaWrite};
 
-/// A key-value operation serialized to the log file.
+/// What gets written to the WAL and `SSTable`s.
 #[derive(Debug, SchemaRead, SchemaWrite, Clone, PartialEq)]
 pub enum Entry {
-    /// Stores a value for the given key.
-    Set { key: String, value: String },
-    /// Tombstone — marks a key as deleted.
-    Delete { key: String },
+    Set {
+        key: String,
+        value: String,
+    },
+    /// Tombstone.
+    Delete {
+        key: String,
+    },
 }
 
 impl Entry {
-    /// Returns the key for any entry variant.
     pub fn key(&self) -> &str {
         match self {
             Self::Set { key, .. } | Self::Delete { key } => key.as_str(),
         }
     }
 
-    /// Returns the value if this is a `Set` entry, `None` for `Delete`.
     pub fn value(&self) -> Option<&str> {
         match self {
             Self::Set { value, .. } => Some(value.as_str()),
@@ -25,7 +27,6 @@ impl Entry {
         }
     }
 
-    /// Constructs a `Set` entry.
     pub fn set(key: impl Into<String>, value: impl Into<String>) -> Self {
         Self::Set {
             key: key.into(),
@@ -33,7 +34,6 @@ impl Entry {
         }
     }
 
-    /// Constructs a `Delete` tombstone entry.
     pub fn delete(key: impl Into<String>) -> Self {
         Self::Delete { key: key.into() }
     }

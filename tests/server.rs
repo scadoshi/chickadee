@@ -13,8 +13,7 @@ use std::{
 };
 use tempfile::tempdir;
 
-/// Binds a server on a random port, spawns it in a background thread.
-/// Returns the bound address so tests can connect to it.
+/// Spawns a server on a random port and returns its address.
 fn start_server() -> std::net::SocketAddr {
     let dir = tempdir().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -26,7 +25,7 @@ fn start_server() -> std::net::SocketAddr {
     ));
 
     thread::spawn(move || {
-        // Keep dir alive for the lifetime of the thread
+        // Moved in so the tempdir outlives the server thread.
         let _dir = dir;
         for stream in listener.incoming() {
             let log = Arc::clone(&log);
@@ -41,7 +40,6 @@ fn start_server() -> std::net::SocketAddr {
     addr
 }
 
-/// Sends a command line to the server and returns the response line (trimmed).
 fn send(stream: &mut BufReader<TcpStream>, writer: &mut impl Write, cmd: &str) -> String {
     writeln!(writer, "{cmd}").unwrap();
     writer.flush().unwrap();

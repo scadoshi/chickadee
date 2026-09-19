@@ -7,20 +7,14 @@ use std::{
 };
 
 impl Log {
-    /// compacts all `SSTables` into a compactd set using a k-way compact.
-    /// Processes entries in sorted key order across all files simultaneously;
-    /// when multiple `SSTables` contain the same key, the newest file wins.
-    /// Intermediate output is flushed to new `SSTable` files when the 4 MB threshold
-    /// is exceeded, with a final flush for any remaining entries.
-    /// All original `SSTables` are deleted once the compactd output is written.
+    /// K-way merge of every `SSTable` into a fresh set. Walks all files in key order; on a
+    /// duplicate key the newest file wins and tombstones are dropped. Output flushes at the
+    /// memtable threshold, then the originals are deleted.
     pub fn compact(&mut self) -> anyhow::Result<()> {
-        // Get entries and sort desc by path--will correlate to most recent ordering first
+        // File names are timestamps, so descending order is newest first.
         let mut entries: Vec<_> = read_dir(&self.sstables_path)?.collect::<Result<_, _>>()?;
         entries.sort_by_key(|e| Reverse(e.file_name()));
-        // Use this later for cleaning up old SSTables
         let to_delete: Vec<_> = entries.iter().map(std::fs::DirEntry::path).collect();
-        // Build a (Entry, File) structure so we can keep track of latest entry and File to get
-        // more entries
         let sstable_opts: Vec<Option<SSTable>> = entries
             .into_iter()
             .map(|e| SSTable::from_path(e.path()))
@@ -30,19 +24,14 @@ impl Log {
             .flatten()
             .map(|sst| (None::<Entry>, sst))
             .collect();
-        // Initialize first entry for every file
         for (entry, sstable) in &mut sstables {
             *entry = sstable.read_next_entry()?;
         }
-        // For writing to
         let mut memtable = MemTable::new();
-        // Track keys for which a winner (Set or Delete) has already been determined
+        // Keys that already have a winner, Set or Delete.
         let mut seen_keys: HashSet<String> = HashSet::new();
-        // Looping begins
         loop {
-            // Retain non-exhausted files
             sstables.retain(|(entry, _)| entry.is_some());
-            // Find min key; none means all files have been exhausted
             let Some(min) = sstables
                 .iter()
                 .filter_map(|(entry, _)| entry.as_ref())
@@ -51,9 +40,8 @@ impl Log {
             else {
                 break;
             };
-            // Write to memtable
-            // First which includes min is winner; tombstone winners are dropped (not written)
-            // All which include min should be advanced
+            // The first file holding min wins; every file holding min advances. A winning
+            // tombstone is not written, it has done its job.
             for (entry, sstable) in &mut sstables {
                 let Some(entry_ref) = entry.as_ref() else {
                     continue;
@@ -65,22 +53,18 @@ impl Log {
                     if let Entry::Set { .. } = entry_ref {
                         memtable.process(entry_ref.clone())?;
                     }
-                    // Entry::Delete: mark as seen but drop — tombstone served its purpose
                 }
                 if is_particpant {
                     *entry = sstable.read_next_entry()?;
                 }
             }
-            // Maintain in minimum memory store
             if memtable.should_flush() {
                 memtable.flush_to(self.sstables_path.clone())?;
             }
         }
-        // Final flush
         if !memtable.is_empty() {
             memtable.flush_to(self.sstables_path.clone())?;
         }
-        // Delete old SSTables
         for path in to_delete {
             remove_file(path)?;
         }
@@ -228,9 +212,8 @@ mod tests {
 
     #[test]
     fn compact_drops_tombstone_from_output() {
-        // Regression: tombstone resurrection via compact. A Delete entry that wins during
-        // compaction must not appear in the compacted SSTable — it must be silently dropped so
-        // that a subsequent get() returns None rather than resurrecting an older Set entry.
+        // Regression: a winning Delete used to be written into the compacted SSTable, and
+        // get() then resurrected the older Set behind it.
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();

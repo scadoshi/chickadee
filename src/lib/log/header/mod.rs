@@ -17,8 +17,11 @@ pub(super) const MAGIC: u16 = 0x4443;
 mod tests {
     #![allow(clippy::as_conversions, clippy::cast_possible_truncation)]
     use super::{
-        MAGIC, deserializer::CorruptionType, deserializer::HeaderDeserializer,
-        reader::HeaderReader, serializer::HeaderSerializer, writer::HeaderWriter,
+        MAGIC,
+        deserializer::{CorruptionType, HeaderDeserializer},
+        reader::HeaderReader,
+        serializer::HeaderSerializer,
+        writer::HeaderWriter,
     };
     use crate::log::entry::Entry;
     use std::io::{Seek, SeekFrom, Write};

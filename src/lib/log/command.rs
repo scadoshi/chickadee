@@ -435,6 +435,6 @@ mod tests {
     #[test]
     fn execute_help_writes_command_list() {
         let (_dir, mut log) = temp_log();
-        assert!(!run(&mut log, Command::Help).is_empty());
+        assert_ne!(run(&mut log, Command::Help), "");
     }
 }

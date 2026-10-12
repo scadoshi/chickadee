@@ -3,3 +3,6 @@
 data/
 .env
 demo/out
+
+# Worktrees created by Claude Code sessions
+.claude/worktrees/

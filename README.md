@@ -33,7 +33,7 @@ Connect with netcat:
 nc 127.0.0.1 3000
 ```
 
-Multiple clients can connect concurrently — each connection gets its own thread, sharing the same underlying store.
+Multiple clients can connect concurrently. Each connection gets its own thread, sharing the same underlying store.
 
 ### Tests
 
@@ -70,7 +70,7 @@ Chickadee is an LSM-tree (Log-Structured Merge-tree) key-value store.
 **Read path**
 - Reads check the memtable first, then scan SSTable files newest-to-oldest
 - Each SSTable has a bloom filter (k=7, 10 bits/key, ~1% false positive rate) for fast negative lookups
-- SSTable filenames are microsecond Unix timestamps, zero-padded — lexicographic order = chronological order
+- SSTable filenames are microsecond Unix timestamps, zero-padded, so lexicographic order = chronological order
 
 **Deletes**
 - Delete writes a tombstone entry to both the WAL and memtable
@@ -84,7 +84,7 @@ Chickadee is an LSM-tree (Log-Structured Merge-tree) key-value store.
 
 **Concurrency**
 - The `Log` is wrapped in `Arc<Mutex<Log>>` and shared across connection threads
-- Locking is per-command, not per-connection — threads only hold the lock for a single operation
+- Locking is per-command, not per-connection: threads only hold the lock for a single operation
 
 ## Project structure
 

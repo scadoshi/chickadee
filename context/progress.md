@@ -91,10 +91,7 @@
 ### Step 6 — Entry type consolidation (COMPLETE)
 
 #### Motivation
-`WalEntry`/`SstEntry` split introduced to enforce SSTable-only-Set constraint created a
-**tombstone resurrection bug**: deleting a flushed key cleared the memtable only; the SSTable
-still contained the Set and `get()` would find it again. Fix: single `Entry` enum used everywhere;
-tombstones survive into SSTables; `compact()` drops tombstone winners so they don't accumulate.
+`WalEntry`/`SstEntry` split introduced to enforce SSTable-only-Set constraint created a **tombstone resurrection bug**: deleting a flushed key cleared the memtable only; the SSTable still contained the Set and `get()` would find it again. Fix: single `Entry` enum used everywhere; tombstones survive into SSTables; `compact()` drops tombstone winners so they don't accumulate.
 
 #### Completed
 - [x] Deleted `src/log/wal/entry.rs` and `src/log/sstable/entry.rs`

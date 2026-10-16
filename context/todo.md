@@ -2,8 +2,7 @@
 
 ## Phases 1–6 — COMPLETE
 
-A fully functional LSM-tree key-value store with a CLI, TCP server, and concurrent connection handling.
-99 tests passing. See `context/progress.md` for full detail.
+A fully functional LSM-tree key-value store with a CLI, TCP server, and concurrent connection handling. 99 tests passing. See `context/progress.md` for full detail.
 
 ---
 

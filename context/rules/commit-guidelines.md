@@ -10,14 +10,11 @@
 
 ## CI: how your commits get checked (run these BEFORE you push)
 
-`.github/workflows/ci.yml` runs `test` and `lint` on every push to `main` and
-every pull request. Reproduce the gate locally first.
+`.github/workflows/ci.yml` runs `test` and `lint` on every push to `main` and every pull request. Reproduce the gate locally first.
 
 ### 1. Format with nightly
 
-`rustfmt.toml` enables `imports_granularity = "Crate"`, an unstable option, so
-stable `cargo fmt` silently skips it: your code looks formatted locally but
-fails CI.
+`rustfmt.toml` enables `imports_granularity = "Crate"`, an unstable option, so stable `cargo fmt` silently skips it: your code looks formatted locally but fails CI.
 
 ```bash
 cargo +nightly fmt        # not `cargo fmt`; stable can't apply the Crate imports rule
@@ -29,9 +26,7 @@ cargo +nightly fmt        # not `cargo fmt`; stable can't apply the Crate import
 cargo clippy --all-targets -- -D warnings
 ```
 
-Lint levels live in `Cargo.toml` `[lints.clippy]`. The panic family (`unwrap`,
-`expect`, `panic`, indexing, slicing) is denied outside tests; `clippy.toml`
-allows it inside them.
+Lint levels live in `Cargo.toml` `[lints.clippy]`. The panic family (`unwrap`, `expect`, `panic`, indexing, slicing) is denied outside tests; `clippy.toml` allows it inside them.
 
 ### 3. Tests
 

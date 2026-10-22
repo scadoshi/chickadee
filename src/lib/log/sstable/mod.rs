@@ -1,10 +1,15 @@
 pub(super) mod bloom_filter;
 pub(super) mod compact;
 
-use self::bloom_filter::{BloomFilter, BloomFilterReader};
-use super::{entry::Entry, header::reader::HeaderReader};
+use std::fs::File;
+use std::io::Seek;
+use std::path::Path;
+
 use anyhow::Context;
-use std::{fs::File, io::Seek, path::Path};
+
+use self::bloom_filter::{BloomFilter, BloomFilterReader};
+use super::entry::Entry;
+use super::header::reader::HeaderReader;
 
 /// An immutable, on-disk sorted table of key-value entries produced by flushing the
 /// memtable.

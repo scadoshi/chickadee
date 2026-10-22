@@ -1,6 +1,9 @@
-use super::serializer::HeaderSerializer;
 use std::io::{Seek, SeekFrom, Write};
-use wincode::{SchemaWrite, config::DefaultConfig};
+
+use wincode::SchemaWrite;
+use wincode::config::DefaultConfig;
+
+use super::serializer::HeaderSerializer;
 
 /// On-disk record format: `[magic: 2B][crc32: 4B][entry_len: 4B][wincode payload]`.
 pub(crate) trait HeaderWriter<T>

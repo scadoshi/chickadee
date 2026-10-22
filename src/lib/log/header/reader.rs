@@ -1,7 +1,10 @@
-use super::deserializer::HeaderDeserializer;
-use anyhow::Context;
 use std::io::{Read, Seek, SeekFrom};
-use wincode::{SchemaRead, config::DefaultConfig};
+
+use anyhow::Context;
+use wincode::SchemaRead;
+use wincode::config::DefaultConfig;
+
+use super::deserializer::HeaderDeserializer;
 
 /// Reads entries in the on-disk header format:
 /// `[magic: 2B][crc32: 4B][entry_len: 4B][wincode-serialized Entry]`

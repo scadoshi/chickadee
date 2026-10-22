@@ -1,10 +1,11 @@
+use std::cmp::Reverse;
+use std::collections::HashSet;
+use std::fs::{read_dir, remove_file};
+
 use super::SSTable;
-use crate::log::{Log, entry::Entry, memtable::MemTable};
-use std::{
-    cmp::Reverse,
-    collections::HashSet,
-    fs::{read_dir, remove_file},
-};
+use crate::log::Log;
+use crate::log::entry::Entry;
+use crate::log::memtable::MemTable;
 
 impl Log {
     /// Compacts all `SSTable`s into a fresh set using a k-way merge.

@@ -1,12 +1,9 @@
-use chickadee::{
-    log::{DATA_PATH, Log, SSTABLES_PATH, WAL_PATH},
-    run::Runner,
-    tui,
-};
-use std::{
-    io::{BufReader, stdin, stdout},
-    sync::{Arc, Mutex},
-};
+use std::io::{BufReader, stdin, stdout};
+use std::sync::{Arc, Mutex};
+
+use chickadee::log::{DATA_PATH, Log, SSTABLES_PATH, WAL_PATH};
+use chickadee::run::Runner;
+use chickadee::tui;
 
 fn repl() -> anyhow::Result<()> {
     tui::welcome();

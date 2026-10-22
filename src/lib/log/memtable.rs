@@ -1,16 +1,16 @@
-use super::{
-    entry::Entry,
-    header::{reader::HeaderReader, writer::HeaderWriter},
-    sstable::bloom_filter::BloomFilter,
-};
+use std::collections::BTreeMap;
+use std::collections::btree_map::Values;
+use std::fs::{File, OpenOptions};
+use std::io::{Seek, SeekFrom, Write};
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use anyhow::Context;
-use std::{
-    collections::{BTreeMap, btree_map::Values},
-    fs::{File, OpenOptions},
-    io::{Seek, SeekFrom, Write},
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
+
+use super::entry::Entry;
+use super::header::reader::HeaderReader;
+use super::header::writer::HeaderWriter;
+use super::sstable::bloom_filter::BloomFilter;
 
 /// In-memory sorted map of the most recent entry per key. Tracks its own byte size so the
 /// log knows when to flush.
@@ -141,9 +141,12 @@ mod tests {
         clippy::cast_sign_loss,
         clippy::arithmetic_side_effects
     )]
+    use std::fs::read_dir;
+    use std::io::Read;
+
     use super::*;
-    use crate::log::{Log, header::writer::HeaderWriter};
-    use std::{fs::read_dir, io::Read};
+    use crate::log::Log;
+    use crate::log::header::writer::HeaderWriter;
 
     #[test]
     fn from_file_empty() {

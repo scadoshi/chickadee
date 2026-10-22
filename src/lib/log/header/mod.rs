@@ -16,15 +16,14 @@ pub(super) const MAGIC: u16 = 0x4443;
 #[cfg(test)]
 mod tests {
     #![allow(clippy::as_conversions, clippy::cast_possible_truncation)]
-    use super::{
-        MAGIC,
-        deserializer::{CorruptionType, HeaderDeserializer},
-        reader::HeaderReader,
-        serializer::HeaderSerializer,
-        writer::HeaderWriter,
-    };
-    use crate::log::entry::Entry;
     use std::io::{Seek, SeekFrom, Write};
+
+    use super::MAGIC;
+    use super::deserializer::{CorruptionType, HeaderDeserializer};
+    use super::reader::HeaderReader;
+    use super::serializer::HeaderSerializer;
+    use super::writer::HeaderWriter;
+    use crate::log::entry::Entry;
 
     // --- Round-trips ---
 
@@ -53,7 +52,7 @@ mod tests {
     #[test]
     fn read_next_skips_garbage_prefix_and_finds_entry() {
         let mut file = tempfile::tempfile().unwrap();
-        file.write_all(&[0xFF; 5]).unwrap();
+        file.write_all(&[0xff; 5]).unwrap();
         let entry = Entry::set("key", "value");
         file.header_write(&entry).unwrap();
         file.seek(SeekFrom::Start(0)).unwrap();
@@ -130,7 +129,7 @@ mod tests {
 
     #[test]
     fn deserialize_err_parse_error() {
-        let garbage = vec![0xFFu8; 20];
+        let garbage = vec![0xffu8; 20];
         let checksum = crc32fast::hash(&garbage);
         let mut bytes = Vec::new();
         bytes.extend(MAGIC.to_le_bytes());

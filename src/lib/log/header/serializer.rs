@@ -1,5 +1,7 @@
+use wincode::SchemaWrite;
+use wincode::config::DefaultConfig;
+
 use super::MAGIC;
-use wincode::{SchemaWrite, config::DefaultConfig};
 
 /// Prepends the on-disk header to a wincode-encoded value.
 pub(super) struct Serializer;

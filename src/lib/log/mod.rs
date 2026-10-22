@@ -4,17 +4,17 @@ pub(crate) mod header;
 pub(crate) mod memtable;
 pub(crate) mod sstable;
 
+use std::cmp::Reverse;
+use std::fs::{File, OpenOptions, create_dir_all, read_dir};
+use std::io::{Seek, SeekFrom};
+use std::path::PathBuf;
+
 pub use command::{Command, CommandError};
 pub use entry::Entry;
-
-use self::{memtable::MemTable, sstable::SSTable};
 use header::writer::HeaderWriter;
-use std::{
-    cmp::Reverse,
-    fs::{File, OpenOptions, create_dir_all, read_dir},
-    io::{Seek, SeekFrom},
-    path::PathBuf,
-};
+
+use self::memtable::MemTable;
+use self::sstable::SSTable;
 
 /// Root of everything persisted.
 pub const DATA_PATH: &str = "data";

@@ -1,12 +1,9 @@
-use chickadee::{
-    log::{DATA_PATH, Log, SSTABLES_PATH, WAL_PATH},
-    run::Runner,
-};
-use std::{
-    io::{BufReader, BufWriter},
-    net::TcpListener,
-    sync::{Arc, Mutex},
-};
+use std::io::{BufReader, BufWriter};
+use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
+
+use chickadee::log::{DATA_PATH, Log, SSTABLES_PATH, WAL_PATH};
+use chickadee::run::Runner;
 
 fn server() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();

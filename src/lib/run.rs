@@ -1,11 +1,8 @@
-use super::log::{
-    Log,
-    command::{Command, Execute},
-};
-use std::{
-    io::{BufRead, Write},
-    sync::{Arc, Mutex},
-};
+use std::io::{BufRead, Write};
+use std::sync::{Arc, Mutex};
+
+use super::log::Log;
+use super::log::command::{Command, Execute};
 
 pub struct Runner<R, W>
 where

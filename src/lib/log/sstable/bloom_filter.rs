@@ -1,8 +1,7 @@
+use std::io::{Read, Seek, SeekFrom};
+use std::ops::{Deref, DerefMut};
+
 use anyhow::Context;
-use std::{
-    io::{Read, Seek, SeekFrom},
-    ops::{Deref, DerefMut},
-};
 
 /// Probabilistic membership filter backed by a fixed-size bit array.
 ///

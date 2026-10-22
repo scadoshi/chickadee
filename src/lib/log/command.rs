@@ -1,7 +1,10 @@
-use super::{Log, entry::Entry};
-use crate::tui;
 use std::io::Write;
+
 use thiserror::Error;
+
+use super::Log;
+use super::entry::Entry;
+use crate::tui;
 
 /// Why a line of input did not parse.
 #[derive(Debug, Error)]
@@ -154,8 +157,9 @@ impl Execute for Log {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::tempdir;
+
+    use super::*;
 
     #[test]
     fn command_set_from_standard() {

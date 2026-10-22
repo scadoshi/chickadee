@@ -4,13 +4,13 @@
     clippy::indexing_slicing,
     clippy::panic
 )]
-use chickadee::{log::Log, run::Runner};
-use std::{
-    io::{BufRead, BufReader, BufWriter, Write},
-    net::{TcpListener, TcpStream},
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+use chickadee::log::Log;
+use chickadee::run::Runner;
 use tempfile::tempdir;
 
 /// Spawns a server on a random port and returns its address.

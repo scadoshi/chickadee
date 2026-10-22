@@ -1,6 +1,8 @@
-use super::{HEADER_LEN, MAGIC};
 use thiserror::Error;
-use wincode::{SchemaRead, config::DefaultConfig};
+use wincode::SchemaRead;
+use wincode::config::DefaultConfig;
+
+use super::{HEADER_LEN, MAGIC};
 
 /// Why a byte slice did not yield an entry.
 #[derive(Debug, Error)]

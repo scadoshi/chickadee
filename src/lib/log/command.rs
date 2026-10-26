@@ -165,7 +165,6 @@ impl Execute for Log {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]

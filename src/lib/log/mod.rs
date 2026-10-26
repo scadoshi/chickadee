@@ -42,7 +42,8 @@ impl Log {
     ///
     /// # Errors
     ///
-    /// Any I/O error from creating the data folders, opening the WAL or reading it back.
+    /// Any I/O error from creating the data folders, opening the WAL, reading it back,
+    /// or listing the `SSTable` folder.
     pub fn new(
         data_path: impl Into<PathBuf>,
         wal_path: impl Into<PathBuf>,
@@ -93,7 +94,7 @@ impl Log {
     ///
     /// # Errors
     ///
-    /// Any I/O error from the WAL or the `SSTable` files, passed through.
+    /// Any I/O error from listing the `SSTable` folder or reading a file in it.
     pub fn get(&self, key: impl AsRef<str>) -> anyhow::Result<Option<Entry>> {
         if let Some(entry) = self.memtable.get(key.as_ref()) {
             return match entry {
@@ -127,7 +128,7 @@ impl Log {
     ///
     /// # Errors
     ///
-    /// Any I/O error from the WAL or the `SSTable` files, passed through.
+    /// Whatever [`Self::get`] returns.
     pub fn contains(&self, key: impl AsRef<str>) -> anyhow::Result<bool> {
         self.get(key).map(|o| o.is_some())
     }
@@ -138,7 +139,8 @@ impl Log {
     ///
     /// # Errors
     ///
-    /// Any I/O error from the WAL or the `SSTable` files, passed through.
+    /// Any I/O error from writing the new `SSTable` or truncating the WAL, or from
+    /// the compaction that every `COMPACT_EVERY_N_FLUSHES`th flush runs.
     pub fn flush(&mut self) -> anyhow::Result<()> {
         self.memtable.flush_to(self.sstables_path.clone())?;
         self.wal_file.set_len(0)?;
@@ -154,7 +156,7 @@ impl Log {
     ///
     /// # Errors
     ///
-    /// Any I/O error from the WAL or the `SSTable` files, passed through.
+    /// Whatever [`Self::flush`] returns when it runs.
     pub fn maybe_flush(&mut self) -> anyhow::Result<()> {
         if self.memtable.should_flush() {
             self.flush()

@@ -18,12 +18,12 @@ impl Log {
     ///
     /// # Errors
     ///
-    /// Any I/O error from the WAL or the `SSTable` files, passed through.
+    /// Any I/O error from reading, writing or deleting `SSTable` files.
     pub fn compact(&mut self) -> anyhow::Result<()> {
         // File names are timestamps, so descending order is newest first.
         let mut entries: Vec<_> = fs::read_dir(&self.sstables_path)?.collect::<Result<_, _>>()?;
         entries.sort_by_key(|e| Reverse(e.file_name()));
-        let to_delete: Vec<_> = entries.iter().map(std::fs::DirEntry::path).collect();
+        let to_delete: Vec<_> = entries.iter().map(fs::DirEntry::path).collect();
         let sstable_opts: Vec<Option<SSTable>> = entries
             .into_iter()
             .map(|e| SSTable::from_path(e.path()))

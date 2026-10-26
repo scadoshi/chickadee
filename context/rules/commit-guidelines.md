@@ -27,7 +27,7 @@ cargo clippy --all-targets -- -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps   # rustdoc warnings fail CI's lint job the way clippy's do
 ```
 
-Lint levels live in `Cargo.toml` `[lints.clippy]`. The panic family (`unwrap`, `expect`, `panic`, indexing, slicing) is denied outside tests; `clippy.toml` allows it inside them.
+Lint levels live in `Cargo.toml` `[lints]`: the [scadoshi-rust](https://github.com/scadoshi/scadoshi-rust) set. The panic family (`unwrap`, `expect`, `panic`, indexing, slicing) is denied outside tests; `clippy.toml` allows it inside them. A suppression is `#[expect(lint, reason = "...")]`, never `#[allow]`, and every public item has a doc, with an `# Errors` section on anything that returns `Result`.
 
 ### 3. Tests
 

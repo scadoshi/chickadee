@@ -1,3 +1,4 @@
+/// Parsing a line of input into a [`command::Command`] and running it against a [`Log`].
 pub mod command;
 pub(crate) mod entry;
 pub(crate) mod header;
@@ -38,6 +39,10 @@ pub struct Log {
 impl Log {
     /// Opens or creates the WAL and rebuilds the memtable from its contents. `truncate`
     /// wipes an existing WAL instead of replaying it.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from creating the data folders, opening the WAL or reading it back.
     pub fn new(
         data_path: impl Into<PathBuf>,
         wal_path: impl Into<PathBuf>,
@@ -72,6 +77,10 @@ impl Log {
 
     /// Appends the entry with its header to the WAL and syncs to disk, then applies it
     /// to the memtable.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from appending to or syncing the WAL.
     pub fn write(&mut self, entry: Entry) -> anyhow::Result<()> {
         self.wal_file.header_write(&entry)?;
         self.wal_file.sync_all()?;
@@ -81,6 +90,10 @@ impl Log {
 
     /// Looks up a key: checks the memtable first, then scans `SSTable`s newest to oldest.
     /// Returns `None` if the key is absent or deleted in either layer.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from the WAL or the `SSTable` files, passed through.
     pub fn get(&self, key: impl AsRef<str>) -> anyhow::Result<Option<Entry>> {
         if let Some(entry) = self.memtable.get(key.as_ref()) {
             return match entry {
@@ -111,6 +124,10 @@ impl Log {
     }
 
     /// Whether `get` would find `key`.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from the WAL or the `SSTable` files, passed through.
     pub fn contains(&self, key: impl AsRef<str>) -> anyhow::Result<bool> {
         self.get(key).map(|o| o.is_some())
     }
@@ -118,6 +135,10 @@ impl Log {
     /// Writes all memtable entries, sorted by key, to a new timestamped `SSTable` file,
     /// then truncates the WAL and clears the memtable. Every `COMPACT_EVERY_N_FLUSHES`
     /// flushes it also runs a compaction.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from the WAL or the `SSTable` files, passed through.
     pub fn flush(&mut self) -> anyhow::Result<()> {
         self.memtable.flush_to(self.sstables_path.clone())?;
         self.wal_file.set_len(0)?;
@@ -130,6 +151,10 @@ impl Log {
     }
 
     /// Flushes to an `SSTable` only if the memtable is past `FLUSH_THRESHOLD_MB`.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from the WAL or the `SSTable` files, passed through.
     pub fn maybe_flush(&mut self) -> anyhow::Result<()> {
         if self.memtable.should_flush() {
             self.flush()

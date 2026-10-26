@@ -2,6 +2,10 @@ use wincode::{SchemaRead, SchemaWrite};
 
 /// What gets written to the WAL and `SSTable`s.
 #[derive(Debug, SchemaRead, SchemaWrite, Clone, PartialEq)]
+#[expect(
+    missing_docs,
+    reason = "each field is the key or value its variant names"
+)]
 pub enum Entry {
     /// A key holds this value.
     Set { key: String, value: String },

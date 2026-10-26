@@ -1,8 +1,8 @@
-#![allow(
+//! The TCP server end to end: a real listener on a random port, driven over sockets.
+
+#![expect(
     clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic
+    reason = "a test: a failed setup or a wrong reply panics and fails it"
 )]
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::{TcpListener, TcpStream};

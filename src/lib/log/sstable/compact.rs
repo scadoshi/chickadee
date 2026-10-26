@@ -15,6 +15,10 @@ impl Log {
     /// Intermediate output is flushed to new `SSTable` files whenever the memtable
     /// threshold is exceeded, with a final flush for whatever remains. All original
     /// `SSTable`s are deleted once the compacted output is written.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from the WAL or the `SSTable` files, passed through.
     pub fn compact(&mut self) -> anyhow::Result<()> {
         // File names are timestamps, so descending order is newest first.
         let mut entries: Vec<_> = read_dir(&self.sstables_path)?.collect::<Result<_, _>>()?;

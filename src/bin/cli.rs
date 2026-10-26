@@ -1,3 +1,6 @@
+//! The interactive CLI: a read-eval-print loop over stdin and stdout against the
+//! store in `data/`.
+
 use std::io::{BufReader, stdin, stdout};
 use std::sync::{Arc, Mutex};
 

@@ -134,12 +134,12 @@ impl MemTable {
 
 #[cfg(test)]
 mod tests {
-    #![allow(
+    #![expect(
         clippy::as_conversions,
         clippy::cast_possible_truncation,
         clippy::cast_possible_wrap,
         clippy::cast_sign_loss,
-        clippy::arithmetic_side_effects
+        reason = "test fixtures corrupt and measure the WAL by hand with small known offsets"
     )]
     use std::fs::read_dir;
     use std::io::Read;

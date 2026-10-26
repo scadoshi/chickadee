@@ -22,6 +22,10 @@ pub enum CommandError {
 
 /// A parsed line of user input. `Quit` and `Help` never touch the log.
 #[derive(Debug)]
+#[expect(
+    missing_docs,
+    reason = "each field is the key or value its command names"
+)]
 pub enum Command {
     /// Store a value under a key.
     Set { key: String, value: String },
@@ -121,6 +125,10 @@ impl Command {
 /// handling sits next to `Command`.
 pub trait Execute {
     /// Applies `command` and writes the response to `writer`.
+    ///
+    /// # Errors
+    ///
+    /// Any I/O error from the log or from writing the response.
     fn execute(&mut self, command: Command, writer: &mut impl Write) -> anyhow::Result<()>;
 }
 

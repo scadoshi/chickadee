@@ -15,7 +15,11 @@ pub(super) const MAGIC: u16 = 0x4443;
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::as_conversions, clippy::cast_possible_truncation)]
+    #![expect(
+        clippy::as_conversions,
+        clippy::cast_possible_truncation,
+        reason = "test fixtures build header bytes by hand from small known values"
+    )]
     use std::io::{Seek, SeekFrom, Write};
 
     use super::MAGIC;

@@ -1,3 +1,6 @@
+//! The TCP server: listens on `ADDRESS:PORT` from `.env` and runs one command loop
+//! per connection against a shared store in `data/`.
+
 use std::io::{BufReader, BufWriter};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};

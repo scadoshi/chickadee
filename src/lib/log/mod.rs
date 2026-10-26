@@ -6,7 +6,7 @@ pub(crate) mod memtable;
 pub(crate) mod sstable;
 
 use std::cmp::Reverse;
-use std::fs::{File, OpenOptions, create_dir_all, read_dir};
+use std::fs::{self, File, OpenOptions};
 use std::io::{Seek, SeekFrom};
 use std::path::PathBuf;
 
@@ -52,8 +52,8 @@ impl Log {
         let data_path = data_path.into();
         let wal_path = wal_path.into();
         let sstables_path = sstables_path.into();
-        create_dir_all(&data_path)?;
-        create_dir_all(&sstables_path)?;
+        fs::create_dir_all(&data_path)?;
+        fs::create_dir_all(&sstables_path)?;
         let mut wal_file = OpenOptions::new()
             .create(true)
             .truncate(truncate)
@@ -63,7 +63,7 @@ impl Log {
         let memtable = MemTable::from_file(&mut wal_file)?;
         // One SSTable per flush, so the file count is the flush count.
         let flush_count = u64::try_from(
-            read_dir(&sstables_path)?
+            fs::read_dir(&sstables_path)?
                 .collect::<Result<Vec<_>, _>>()?
                 .len(),
         )?;
@@ -103,7 +103,7 @@ impl Log {
         }
         // Linear scan of each candidate SSTable for now.
         let mut dir_entries: Vec<_> =
-            read_dir(&self.sstables_path)?.collect::<Result<Vec<_>, _>>()?;
+            fs::read_dir(&self.sstables_path)?.collect::<Result<Vec<_>, _>>()?;
         dir_entries.sort_by_key(|e| Reverse(e.file_name()));
         for dir_entry in dir_entries {
             let Some(mut sstable) = SSTable::from_path(dir_entry.path())? else {
@@ -174,7 +174,7 @@ mod tests {
             dir.path(),
             dir.path().join("memtable"),
             dir.path().join("sstables"),
-            true,
+            /* truncate */ true,
         )
         .unwrap();
         (dir, log)
@@ -192,10 +192,22 @@ mod tests {
         let memtable_path = dir.path().join("test.log");
         let sstables_path = dir.path().join("sstables");
         {
-            let mut log = Log::new(dir.path(), &memtable_path, &sstables_path, true).unwrap();
+            let mut log = Log::new(
+                dir.path(),
+                &memtable_path,
+                &sstables_path,
+                /* truncate */ true,
+            )
+            .unwrap();
             log.write(Entry::set("a", "1")).unwrap();
         }
-        let log = Log::new(dir.path(), &memtable_path, &sstables_path, false).unwrap();
+        let log = Log::new(
+            dir.path(),
+            &memtable_path,
+            &sstables_path,
+            /* truncate */ false,
+        )
+        .unwrap();
         assert_eq!(log.memtable.len(), 1);
         assert!(log.memtable.contains_key("a"));
     }
@@ -241,7 +253,7 @@ mod tests {
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();
-        let sst_exists = read_dir(log.sstables_path)
+        let sst_exists = fs::read_dir(log.sstables_path)
             .unwrap()
             .filter_map(std::result::Result::ok)
             .any(|e| e.path().extension().is_some_and(|ext| ext == "sst"));
@@ -271,7 +283,7 @@ mod tests {
         log.maybe_flush().unwrap();
         assert!(!log.memtable.is_empty());
         assert!(log.wal_file.metadata().unwrap().len() != 0);
-        let sst_exists = read_dir(&log.sstables_path)
+        let sst_exists = fs::read_dir(&log.sstables_path)
             .into_iter()
             .flatten()
             .filter_map(std::result::Result::ok)

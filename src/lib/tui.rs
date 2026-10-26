@@ -3,6 +3,7 @@ const HR_CHAR: &str = "-";
 const HR_WIDTH: usize = 36;
 
 /// Prints the banner and command list.
+#[expect(clippy::print_stdout, reason = "the banner is the CLI's own output")]
 pub fn welcome() {
     println!("Welcome to chickadee");
     println!("Try the following commands");
@@ -12,6 +13,7 @@ pub fn welcome() {
 }
 
 /// Prints a horizontal rule.
+#[expect(clippy::print_stdout, reason = "the rule is the CLI's own output")]
 pub fn hr() {
     println!("{}", HR_CHAR.repeat(HR_WIDTH));
 }

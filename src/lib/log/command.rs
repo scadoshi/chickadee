@@ -165,7 +165,6 @@ impl Execute for Log {
 
 #[cfg(test)]
 mod tests {
-    use tempfile::tempdir;
 
     use super::*;
 
@@ -320,12 +319,12 @@ mod tests {
     }
 
     fn temp_log() -> (tempfile::TempDir, Log) {
-        let dir = tempdir().unwrap();
+        let dir = tempfile::tempdir().unwrap();
         let log = Log::new(
             dir.path(),
             dir.path().join("test.log"),
             dir.path().join("sstables"),
-            true,
+            /* truncate */ true,
         )
         .unwrap();
         (dir, log)
@@ -373,13 +372,25 @@ mod tests {
         let memtable_path = dir.path().join("test.log");
         let sstables_path = dir.path().join("sstables");
         {
-            let mut log = Log::new(dir.path(), &memtable_path, &sstables_path, true).unwrap();
+            let mut log = Log::new(
+                dir.path(),
+                &memtable_path,
+                &sstables_path,
+                /* truncate */ true,
+            )
+            .unwrap();
             log.execute(Command::set("a", "1"), &mut std::io::sink())
                 .unwrap();
             log.execute(Command::delete("a"), &mut std::io::sink())
                 .unwrap();
         }
-        let log = Log::new(dir.path(), &memtable_path, &sstables_path, false).unwrap();
+        let log = Log::new(
+            dir.path(),
+            &memtable_path,
+            &sstables_path,
+            /* truncate */ false,
+        )
+        .unwrap();
         // tombstone is replayed from WAL into memtable
         assert!(!log.memtable.is_empty());
         assert!(log.get("a").unwrap().is_none());

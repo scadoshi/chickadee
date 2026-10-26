@@ -11,17 +11,22 @@ use std::thread;
 
 use chickadee::log::Log;
 use chickadee::run::Runner;
-use tempfile::tempdir;
 
 /// Spawns a server on a random port and returns its address.
 fn start_server() -> std::net::SocketAddr {
-    let dir = tempdir().unwrap();
+    let dir = tempfile::tempdir().unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     let wal_path = dir.path().join("wal");
     let sstables_path = dir.path().join("sstables");
     let log = Arc::new(Mutex::new(
-        Log::new(dir.path(), wal_path, sstables_path, true).unwrap(),
+        Log::new(
+            dir.path(),
+            wal_path,
+            sstables_path,
+            /* truncate */ true,
+        )
+        .unwrap(),
     ));
 
     thread::spawn(move || {

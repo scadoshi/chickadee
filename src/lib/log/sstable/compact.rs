@@ -1,6 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
-use std::fs::{read_dir, remove_file};
+use std::fs;
 
 use super::SSTable;
 use crate::log::Log;
@@ -21,7 +21,7 @@ impl Log {
     /// Any I/O error from the WAL or the `SSTable` files, passed through.
     pub fn compact(&mut self) -> anyhow::Result<()> {
         // File names are timestamps, so descending order is newest first.
-        let mut entries: Vec<_> = read_dir(&self.sstables_path)?.collect::<Result<_, _>>()?;
+        let mut entries: Vec<_> = fs::read_dir(&self.sstables_path)?.collect::<Result<_, _>>()?;
         entries.sort_by_key(|e| Reverse(e.file_name()));
         let to_delete: Vec<_> = entries.iter().map(std::fs::DirEntry::path).collect();
         let sstable_opts: Vec<Option<SSTable>> = entries
@@ -75,7 +75,7 @@ impl Log {
             memtable.flush_to(self.sstables_path.clone())?;
         }
         for path in to_delete {
-            remove_file(path)?;
+            fs::remove_file(path)?;
         }
         Ok(())
     }
@@ -91,7 +91,7 @@ mod tests {
             dir.path(),
             dir.path().join("memtable"),
             dir.path().join("sstables"),
-            true,
+            /* truncate */ true,
         )
         .unwrap();
         (dir, log)
@@ -102,7 +102,7 @@ mod tests {
         let (_dir, mut log) = temp_log();
         log.compact().unwrap();
         assert_eq!(
-            read_dir(&log.sstables_path)
+            fs::read_dir(&log.sstables_path)
                 .unwrap()
                 .flatten()
                 .filter(|e| e.path().extension().is_some_and(|ext| ext == "sst"))
@@ -142,14 +142,14 @@ mod tests {
         log.flush().unwrap();
         log.write(Entry::set("b", "2")).unwrap();
         log.flush().unwrap();
-        let existing_paths: Vec<_> = read_dir(&log.sstables_path)
+        let existing_paths: Vec<_> = fs::read_dir(&log.sstables_path)
             .unwrap()
             .flatten()
             .map(|e| e.path())
             .collect();
         log.compact().unwrap();
         assert!(
-            read_dir(&log.sstables_path)
+            fs::read_dir(&log.sstables_path)
                 .unwrap()
                 .flatten()
                 .all(|e| !existing_paths.contains(&e.path()))
@@ -181,9 +181,9 @@ mod tests {
         log.flush().unwrap();
         log.write(Entry::set("a", "2")).unwrap();
         log.flush().unwrap();
-        let count = read_dir(&log.sstables_path).unwrap().count();
+        let count = fs::read_dir(&log.sstables_path).unwrap().count();
         log.compact().unwrap();
-        assert!(count > read_dir(&log.sstables_path).unwrap().count());
+        assert!(count > fs::read_dir(&log.sstables_path).unwrap().count());
     }
 
     #[test]
@@ -191,7 +191,7 @@ mod tests {
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();
-        let original: Vec<_> = read_dir(&log.sstables_path)
+        let original: Vec<_> = fs::read_dir(&log.sstables_path)
             .unwrap()
             .flatten()
             .map(|e| e.path())
@@ -199,7 +199,10 @@ mod tests {
         assert_eq!(original.len(), 1);
         log.compact().unwrap();
         assert!(!original[0].exists());
-        assert_eq!(read_dir(&log.sstables_path).unwrap().flatten().count(), 1);
+        assert_eq!(
+            fs::read_dir(&log.sstables_path).unwrap().flatten().count(),
+            1
+        );
     }
 
     #[test]

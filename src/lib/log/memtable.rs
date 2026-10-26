@@ -141,7 +141,7 @@ mod tests {
         clippy::cast_sign_loss,
         reason = "test fixtures corrupt and measure the WAL by hand with small known offsets"
     )]
-    use std::fs::read_dir;
+    use std::fs;
     use std::io::Read;
 
     use super::*;
@@ -328,7 +328,7 @@ mod tests {
             dir.path(),
             dir.path().join("memtable"),
             dir.path().join("sstables"),
-            true,
+            /* truncate */ true,
         )
         .unwrap();
         (dir, log)
@@ -341,7 +341,7 @@ mod tests {
         log.write(Entry::set("b", "2")).unwrap();
         log.write(Entry::set("c", "3")).unwrap();
         log.flush().unwrap();
-        let sstable_path = read_dir(log.sstables_path)
+        let sstable_path = fs::read_dir(log.sstables_path)
             .unwrap()
             .flatten()
             .next()
@@ -369,7 +369,7 @@ mod tests {
         let set = Entry::set("a", "1");
         log.write(set.clone()).unwrap();
         log.flush().unwrap();
-        let sstable_path = read_dir(log.sstables_path)
+        let sstable_path = fs::read_dir(log.sstables_path)
             .unwrap()
             .flatten()
             .next()
@@ -405,7 +405,7 @@ mod tests {
         let (_dir, mut log) = temp_log();
         log.write(Entry::set("a", "1")).unwrap();
         log.flush().unwrap();
-        let sstable_path = read_dir(log.sstables_path)
+        let sstable_path = fs::read_dir(log.sstables_path)
             .unwrap()
             .flatten()
             .next()

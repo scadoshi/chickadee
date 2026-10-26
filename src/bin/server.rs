@@ -8,6 +8,11 @@ use std::sync::{Arc, Mutex};
 use chickadee::log::{DATA_PATH, Log, SSTABLES_PATH, WAL_PATH};
 use chickadee::run::Runner;
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "a server's own startup and connection lines go to its terminal"
+)]
 fn server() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     let address = std::env::var("ADDRESS")?;
@@ -17,7 +22,7 @@ fn server() -> anyhow::Result<()> {
         DATA_PATH,
         WAL_PATH,
         SSTABLES_PATH,
-        false,
+        /* truncate */ false,
     )?));
     let listener = TcpListener::bind(bind_address)?;
     println!("Listening on {}", listener.local_addr()?);
@@ -40,8 +45,6 @@ fn server() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn main() {
-    if let Err(e) = server() {
-        eprintln!("{e}");
-    }
+fn main() -> anyhow::Result<()> {
+    server()
 }

@@ -1,7 +1,7 @@
 //! The interactive CLI: a read-eval-print loop over stdin and stdout against the
 //! store in `data/`.
 
-use std::io::{BufReader, stdin, stdout};
+use std::io::{self, BufReader};
 use std::sync::{Arc, Mutex};
 
 use chickadee::log::{DATA_PATH, Log, SSTABLES_PATH, WAL_PATH};
@@ -14,14 +14,12 @@ fn repl() -> anyhow::Result<()> {
         DATA_PATH,
         WAL_PATH,
         SSTABLES_PATH,
-        false,
+        /* truncate */ false,
     )?));
-    let mut runner = Runner::new(BufReader::new(stdin().lock()), stdout().lock());
+    let mut runner = Runner::new(BufReader::new(io::stdin().lock()), io::stdout().lock());
     runner.run(log)
 }
 
-fn main() {
-    if let Err(e) = repl() {
-        eprintln!("{e}");
-    }
+fn main() -> anyhow::Result<()> {
+    repl()
 }

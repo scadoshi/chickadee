@@ -55,15 +55,15 @@ impl Log {
                 let Some(entry_ref) = entry.as_ref() else {
                     continue;
                 };
-                let is_particpant = entry_ref.key() == min;
+                let is_participant = entry_ref.key() == min;
                 let winner_found = seen_keys.contains(min.as_str());
-                if is_particpant && !winner_found {
+                if is_participant && !winner_found {
                     seen_keys.insert(min.clone());
                     if let Entry::Set { .. } = entry_ref {
                         memtable.process(entry_ref.clone())?;
                     }
                 }
-                if is_particpant {
+                if is_participant {
                     *entry = sstable.read_next_entry()?;
                 }
             }
